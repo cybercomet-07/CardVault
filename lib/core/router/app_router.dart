@@ -35,10 +35,10 @@ class AppRouter {
         page = const DashboardPage();
         break;
       case AppRouter.addCard:
-        page = const AddCardPage();
+        page = AddCardPage(cardId: settings.arguments as String?);
         break;
       case AppRouter.cardDetails:
-        page = const CardDetailsPage();
+        page = CardDetailsPage(cardId: settings.arguments as String?);
         break;
       case AppRouter.settings:
         page = const SettingsPage();

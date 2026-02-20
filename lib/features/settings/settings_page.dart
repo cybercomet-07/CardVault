@@ -1,5 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import 'package:card_vault/core/router/app_router.dart';
 import 'package:card_vault/core/theme/app_theme.dart';
 import 'package:card_vault/core/widgets/glass_container.dart';
 import 'package:card_vault/core/widgets/page_scaffold.dart';
@@ -11,6 +13,9 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final user = FirebaseAuth.instance.currentUser;
+    final displayName = user?.displayName?.trim();
+    final email = user?.email ?? '';
 
     return PageScaffold(
       appBar: AppBar(
@@ -39,11 +44,13 @@ class SettingsPage extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Demo User',
+                            displayName != null && displayName.isNotEmpty
+                                ? displayName
+                                : 'User',
                             style: textTheme.titleMedium,
                           ),
                           Text(
-                            'intern@cardvault.dev',
+                            email.isNotEmpty ? email : 'Not signed in',
                             style: textTheme.bodySmall
                                 ?.copyWith(color: Colors.white70),
                           ),
@@ -65,7 +72,7 @@ class SettingsPage extends StatelessWidget {
                               style: textTheme.bodyMedium,
                             ),
                             Text(
-                              'Dark / Light toggle (UI only)',
+                              'Dark / Light',
                               style: textTheme.bodySmall
                                   ?.copyWith(color: Colors.white70),
                             ),
@@ -74,15 +81,7 @@ class SettingsPage extends StatelessWidget {
                       ),
                       Switch(
                         value: true,
-                        onChanged: (_) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Theme toggle is visual only in this demo.',
-                              ),
-                            ),
-                          );
-                        },
+                        onChanged: (_) {},
                       ),
                     ],
                   ),
@@ -96,15 +95,17 @@ class SettingsPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   PrimaryButton(
-                    label: 'Logout (demo)',
+                    label: 'Log out',
                     icon: Icons.logout_rounded,
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content:
-                              Text('Logout not wired (demo only).'),
-                        ),
-                      );
+                    onPressed: () async {
+                      await FirebaseAuth.instance.signOut();
+                      if (context.mounted) {
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          AppRouter.login,
+                          (route) => false,
+                        );
+                      }
                     },
                   ),
                 ],
