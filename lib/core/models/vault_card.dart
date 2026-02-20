@@ -1,12 +1,18 @@
-/// Represents a visiting card document in Firestore.
+/// Represents a business card document in Firestore.
+/// Firestore: cards/{cardId} with userId, companyName, personName, designation,
+/// phone, email, website, address, notes, imageUrl, createdAt.
 class VaultCard {
   VaultCard({
     required this.id,
     required this.userId,
     this.companyName,
     this.personName,
+    this.designation,
     this.phoneNumber,
+    this.email,
+    this.website,
     this.address,
+    this.notes,
     this.imageURL,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -15,8 +21,12 @@ class VaultCard {
   final String userId;
   final String? companyName;
   final String? personName;
+  final String? designation;
   final String? phoneNumber;
+  final String? email;
+  final String? website;
   final String? address;
+  final String? notes;
   final String? imageURL;
   final DateTime createdAt;
 
@@ -25,22 +35,31 @@ class VaultCard {
       'userId': userId,
       'companyName': companyName ?? '',
       'personName': personName ?? '',
+      'designation': designation ?? '',
       'phoneNumber': phoneNumber ?? '',
+      'email': email ?? '',
+      'website': website ?? '',
       'address': address ?? '',
-      'imageURL': imageURL ?? '',
+      'notes': notes ?? '',
+      'imageUrl': imageURL ?? '',
       'createdAt': createdAt.millisecondsSinceEpoch,
     };
   }
 
   factory VaultCard.fromMap(String id, Map<String, dynamic> map) {
+    final imageUrl = map['imageUrl'] as String? ?? map['imageURL'] as String?;
     return VaultCard(
       id: id,
       userId: map['userId'] as String? ?? '',
       companyName: map['companyName'] as String?,
       personName: map['personName'] as String?,
+      designation: map['designation'] as String?,
       phoneNumber: map['phoneNumber'] as String?,
+      email: map['email'] as String?,
+      website: map['website'] as String?,
       address: map['address'] as String?,
-      imageURL: map['imageURL'] as String?,
+      notes: map['notes'] as String?,
+      imageURL: imageUrl,
       createdAt: map['createdAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(
               (map['createdAt'] as num).toInt())
@@ -53,8 +72,12 @@ class VaultCard {
     String? userId,
     String? companyName,
     String? personName,
+    String? designation,
     String? phoneNumber,
+    String? email,
+    String? website,
     String? address,
+    String? notes,
     String? imageURL,
     DateTime? createdAt,
   }) {
@@ -63,8 +86,12 @@ class VaultCard {
       userId: userId ?? this.userId,
       companyName: companyName ?? this.companyName,
       personName: personName ?? this.personName,
+      designation: designation ?? this.designation,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      email: email ?? this.email,
+      website: website ?? this.website,
       address: address ?? this.address,
+      notes: notes ?? this.notes,
       imageURL: imageURL ?? this.imageURL,
       createdAt: createdAt ?? this.createdAt,
     );

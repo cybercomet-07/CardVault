@@ -4,6 +4,7 @@ import 'package:card_vault/features/auth/login_page.dart';
 import 'package:card_vault/features/auth/register_page.dart';
 import 'package:card_vault/features/cards/add_card_page.dart';
 import 'package:card_vault/features/cards/card_details_page.dart';
+import 'package:card_vault/features/cards/cards_page.dart';
 import 'package:card_vault/features/dashboard/dashboard_page.dart';
 import 'package:card_vault/features/settings/settings_page.dart';
 import 'package:card_vault/features/splash/splash_page.dart';
@@ -15,6 +16,7 @@ class AppRouter {
   static const String login = '/login';
   static const String register = '/register';
   static const String dashboard = '/dashboard';
+  static const String cards = '/cards';
   static const String addCard = '/cards/add';
   static const String cardDetails = '/cards/details';
   static const String settings = '/settings';
@@ -33,6 +35,9 @@ class AppRouter {
         break;
       case AppRouter.dashboard:
         page = const DashboardPage();
+        break;
+      case AppRouter.cards:
+        page = CardsPage(initialCardId: settings.arguments as String?);
         break;
       case AppRouter.addCard:
         page = AddCardPage(cardId: settings.arguments as String?);

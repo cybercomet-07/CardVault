@@ -1,14 +1,12 @@
-import 'dart:typed_data';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import 'package:card_vault/core/models/vault_card.dart';
 import 'package:card_vault/core/router/app_router.dart';
 import 'package:card_vault/core/services/firestore_card_service.dart';
 import 'package:card_vault/core/services/storage_card_service.dart';
 import 'package:card_vault/core/theme/app_theme.dart';
+import 'package:card_vault/core/widgets/capture_card_modal.dart';
 import 'package:card_vault/core/widgets/glass_container.dart';
 import 'package:card_vault/core/widgets/page_scaffold.dart';
 import 'package:card_vault/core/widgets/primary_button.dart';
@@ -95,7 +93,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                                           onEdit: () {
                                                             Navigator.pushNamed(
                                                               context,
-                                                              AppRouter.addCard,
+                                                              AppRouter.cards,
                                                               arguments: cards[index].id,
                                                             );
                                                           },
@@ -107,7 +105,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                                       onAddCard: () {
                                                         Navigator.pushNamed(
                                                           context,
-                                                          AppRouter.addCard,
+                                                          AppRouter.cards,
                                                         );
                                                       },
                                                     ),
@@ -147,7 +145,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                               onPressed: () {
                                                 Navigator.pushNamed(
                                                   context,
-                                                  AppRouter.addCard,
+                                                  AppRouter.cards,
                                                 );
                                               },
                                             ),
@@ -216,29 +214,22 @@ class _DashboardPageState extends State<DashboardPage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
+    final bytes = await CaptureCardModal.show(context);
+    if (bytes == null || !mounted) return;
+
     setState(() => _cameraLoading = true);
     try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 85,
-      );
-      if (picked == null || !mounted) {
-        setState(() => _cameraLoading = false);
-        return;
-      }
-      final bytes = await picked.readAsBytes();
-      if (!mounted) return;
-
       final card = VaultCard(
         id: '',
         userId: user.uid,
         companyName: '',
         personName: '',
+        designation: '',
         phoneNumber: '',
+        email: '',
+        website: '',
         address: '',
+        notes: '',
         imageURL: '',
       );
       final docId = await _firestoreCardService.addCard(card);
@@ -246,7 +237,7 @@ class _DashboardPageState extends State<DashboardPage> {
       final url = await _storageCardService.uploadCardImage(
         userId: user.uid,
         cardId: docId,
-        bytes: Uint8List.fromList(bytes),
+        bytes: bytes,
       );
 
       await _firestoreCardService.updateCard(
@@ -256,14 +247,18 @@ class _DashboardPageState extends State<DashboardPage> {
       if (mounted) {
         setState(() => _cameraLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Card image saved. You can add details from the card list.')),
+          const SnackBar(
+            content: Text('Card image saved. Add details on the Cards page.'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
+        Navigator.pushNamed(context, AppRouter.cards);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _cameraLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save: $e')),
+          SnackBar(content: Text('Failed to save: $e'), behavior: SnackBarBehavior.floating),
         );
       }
     }
@@ -312,7 +307,9 @@ class _Sidebar extends StatelessWidget {
           _SidebarItem(
             icon: Icons.credit_card_rounded,
             label: 'Cards',
-            onTap: () {},
+            onTap: () {
+              Navigator.pushNamed(context, AppRouter.cards);
+            },
           ),
           _SidebarItem(
             icon: Icons.settings_rounded,
@@ -422,7 +419,7 @@ class _Header extends StatelessWidget {
             icon: Icons.add_rounded,
             isExpanded: false,
             onPressed: () {
-              Navigator.pushNamed(context, AppRouter.addCard);
+              Navigator.pushNamed(context, AppRouter.cards);
             },
           ),
       ],
@@ -466,19 +463,18 @@ class _CardTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: card.imageURL != null && card.imageURL!.isNotEmpty
-                    ? Image.network(
-                        card.imageURL!,
-                        width: 52,
-                        height: 52,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _placeholderIcon(),
-                      )
-                    : _placeholderIcon(),
-              ),
-              const SizedBox(width: 16),
+              if (card.imageURL != null && card.imageURL!.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    card.imageURL!,
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox(width: 52, height: 52),
+                  ),
+                ),
+              if (card.imageURL != null && card.imageURL!.isNotEmpty) const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -554,14 +550,6 @@ class _CardTile extends StatelessWidget {
     );
   }
 
-  Widget _placeholderIcon() {
-    return Container(
-      width: 52,
-      height: 52,
-      color: AppColors.accentIndigo.withValues(alpha: 0.3),
-      child: const Icon(Icons.business_rounded, color: Colors.white54, size: 28),
-    );
-  }
 }
 
 class _EmptyCardsState extends StatelessWidget {
