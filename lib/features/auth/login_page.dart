@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'package:card_vault/core/router/app_router.dart';
@@ -66,15 +67,37 @@ class _LoginPageState extends State<LoginPage>
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1500));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Auth not wired yet (demo UI only)')),
-    );
-    Navigator.pushReplacementNamed(context, AppRouter.dashboard);
+    setState(() => _isLoading = true);
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Signed in successfully')),
+      );
+      Navigator.pushReplacementNamed(context, AppRouter.dashboard);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      final message = e.code == 'user-not-found' || e.code == 'wrong-password'
+          ? 'Invalid email or password'
+          : (e.message ?? 'Sign in failed');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sign in failed: $e')),
+      );
+    }
   }
 
   @override
@@ -224,11 +247,28 @@ class _LoginPageState extends State<LoginPage>
                                 ),
                                 const Spacer(),
                                 TextButton(
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text('Forgot password (demo)')),
-                                    );
+                                  onPressed: () async {
+                                    final email = _emailController.text.trim();
+                                    if (email.isEmpty) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                            content: Text('Enter your email first')),
+                                      );
+                                      return;
+                                    }
+                                    try {
+                                      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                            content: Text('Password reset email sent. Check your inbox.')),
+                                      );
+                                    } on FirebaseAuthException catch (e) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(e.message ?? 'Failed to send reset email')),
+                                      );
+                                    }
                                   },
                                   style: TextButton.styleFrom(
                                     foregroundColor: AppColors.accentIndigo,

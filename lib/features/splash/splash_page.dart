@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'package:card_vault/core/router/app_router.dart';
@@ -17,7 +18,11 @@ class _SplashPageState extends State<SplashPage> {
     super.initState();
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(AppRouter.login);
+      if (FirebaseAuth.instance.currentUser != null) {
+        Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
+      } else {
+        Navigator.of(context).pushReplacementNamed(AppRouter.login);
+      }
     });
   }
 

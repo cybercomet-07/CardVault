@@ -5,6 +5,8 @@ import 'package:card_vault/core/models/vault_card.dart';
 import 'package:card_vault/core/router/app_router.dart';
 import 'package:card_vault/core/services/firestore_card_service.dart';
 import 'package:card_vault/core/services/storage_card_service.dart';
+import 'package:card_vault/core/services/card_ocr_service_stub.dart'
+    if (dart.library.io) 'package:card_vault/core/services/card_ocr_service_io.dart' as card_ocr;
 import 'package:card_vault/core/theme/app_theme.dart';
 import 'package:card_vault/core/widgets/capture_card_modal.dart';
 import 'package:card_vault/core/widgets/glass_container.dart';
@@ -132,15 +134,25 @@ class _DashboardPageState extends State<DashboardPage> {
                                                 _StatCard(
                                                   label: 'Active cards',
                                                   value: '${cards.length}',
+                                                  onTap: () => _showActiveCardsSheet(context, cards),
                                                 ),
                                                 const SizedBox(width: 12),
-                                                const _StatCard(
+                                                _StatCard(
                                                   label: 'Vaults',
                                                   value: '1',
+                                                  onTap: () => _showVaultGallerySheet(context, cards),
                                                 ),
                                               ],
                                             ),
-                                            const SizedBox(height: 24),
+                                            const SizedBox(height: 20),
+                                            Text(
+                                              'Add new card',
+                                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                                color: Colors.white70,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 10),
                                             _AnimatedAddCardButton(
                                               onPressed: () {
                                                 Navigator.pushNamed(
@@ -175,6 +187,182 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showActiveCardsSheet(BuildContext context, List<VaultCard> cards) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, controller) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Text(
+                'Active cards — card details',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Expanded(
+              child: cards.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No cards yet. Add a card to see details here.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white54),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: controller,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                      itemCount: cards.length,
+                      itemBuilder: (_, index) {
+                        final c = cards[index];
+                        final person = c.personName?.trim().isNotEmpty == true ? c.personName! : '—';
+                        final company = c.companyName?.trim().isNotEmpty == true ? c.companyName! : '—';
+                        final phone = c.phoneNumber?.trim().isNotEmpty == true ? c.phoneNumber! : '—';
+                        final address = c.address?.trim().isNotEmpty == true ? c.address! : '—';
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          color: AppColors.surfaceSecondary.withValues(alpha: 0.9),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            title: Text('Card ${index + 1}', style: Theme.of(context).textTheme.titleSmall),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Person: $person', style: Theme.of(context).textTheme.bodySmall),
+                                  Text('Company: $company', style: Theme.of(context).textTheme.bodySmall),
+                                  Text('Phone: $phone', style: Theme.of(context).textTheme.bodySmall),
+                                  Text('Address: $address', style: Theme.of(context).textTheme.bodySmall),
+                                ],
+                              ),
+                            ),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              Navigator.pushNamed(ctx, AppRouter.cardDetails, arguments: c.id);
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showVaultGallerySheet(BuildContext context, List<VaultCard> cards) {
+    final cardsWithImage = cards.where((c) => c.imageURL != null && c.imageURL!.isNotEmpty).toList();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, controller) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Text(
+                'Vault — card images',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Expanded(
+              child: cardsWithImage.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No card images yet. Capture or upload a card to see images here.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white54),
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  : GridView.builder(
+                      controller: controller,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 1.1,
+                      ),
+                      itemCount: cardsWithImage.length,
+                      itemBuilder: (_, index) {
+                        final c = cardsWithImage[index];
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            showDialog(
+                              context: context,
+                              builder: (dctx) => Dialog(
+                                backgroundColor: Colors.transparent,
+                                child: InteractiveViewer(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Image.network(c.imageURL!, fit: BoxFit.contain),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              c.imageURL!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded, size: 48),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -219,16 +407,19 @@ class _DashboardPageState extends State<DashboardPage> {
 
     setState(() => _cameraLoading = true);
     try {
+      // Extract text from card image (OCR on mobile; null on web)
+      final extracted = await card_ocr.extractCardTextFromImage(bytes);
+
       final card = VaultCard(
         id: '',
         userId: user.uid,
-        companyName: '',
-        personName: '',
+        companyName: extracted?.companyName ?? '',
+        personName: extracted?.personName ?? '',
         designation: '',
-        phoneNumber: '',
-        email: '',
+        phoneNumber: extracted?.phoneNumber ?? '',
+        email: extracted?.email ?? '',
         website: '',
-        address: '',
+        address: extracted?.address ?? '',
         notes: '',
         imageURL: '',
       );
@@ -247,8 +438,12 @@ class _DashboardPageState extends State<DashboardPage> {
       if (mounted) {
         setState(() => _cameraLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Card image saved. Add details on the Cards page.'),
+          SnackBar(
+            content: Text(
+              extracted != null
+                  ? 'Card saved with extracted details. View in Active cards or Cards page.'
+                  : 'Card image saved. Add details on the Cards page.',
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -415,7 +610,7 @@ class _Header extends StatelessWidget {
         ),
         if (isWide)
           PrimaryButton(
-            label: 'Add card',
+            label: 'Add new card',
             icon: Icons.add_rounded,
             isExpanded: false,
             onPressed: () {
@@ -603,7 +798,16 @@ class _EmptyCardsState extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
+              Text(
+                'Add your first card',
+                style: textTheme.titleSmall?.copyWith(
+                  color: AppColors.accentIndigo,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
               PrimaryButton(
                 label: 'Add your first card',
                 icon: Icons.add_rounded,
@@ -618,38 +822,53 @@ class _EmptyCardsState extends StatelessWidget {
 }
 
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.label, required this.value});
+  const _StatCard({
+    required this.label,
+    required this.value,
+    this.onTap,
+  });
 
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceSecondary.withValues(alpha: 0.9),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Colors.white70),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-          ],
-        ),
+    final content = Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSecondary.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(18),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.white70),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ],
+      ),
+    );
+    return Expanded(
+      child: onTap != null
+          ? Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(18),
+                child: content,
+              ),
+            )
+          : content,
     );
   }
 }
@@ -691,7 +910,7 @@ class _AnimatedAddCardButtonState extends State<_AnimatedAddCardButton>
     return ScaleTransition(
       scale: _scale,
       child: PrimaryButton(
-        label: 'Add card',
+        label: 'Add new card',
         icon: Icons.add_rounded,
         onPressed: widget.onPressed,
       ),

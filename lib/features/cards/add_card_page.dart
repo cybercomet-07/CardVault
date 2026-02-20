@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:card_vault/core/models/vault_card.dart';
+import 'package:card_vault/core/services/card_ocr_service_stub.dart'
+    if (dart.library.io) 'package:card_vault/core/services/card_ocr_service_io.dart' as card_ocr;
 import 'package:card_vault/core/services/firestore_card_service.dart';
 import 'package:card_vault/core/services/storage_card_service.dart';
 import 'package:card_vault/core/theme/app_theme.dart';
@@ -124,7 +126,24 @@ class _AddCardPageState extends State<AddCardPage> {
       );
       if (picked != null) {
         final bytes = await picked.readAsBytes();
-        if (mounted) setState(() => _imageBytes = bytes);
+        if (!mounted) return;
+        setState(() => _imageBytes = bytes);
+        // Extract text from image (OCR on mobile; no-op on web) and pre-fill form
+        final extracted = await card_ocr.extractCardTextFromImage(bytes);
+        if (extracted != null && mounted) {
+          if ((extracted.personName ?? '').trim().isNotEmpty) _personController.text = extracted.personName!.trim();
+          if ((extracted.companyName ?? '').trim().isNotEmpty) _companyController.text = extracted.companyName!.trim();
+          if ((extracted.phoneNumber ?? '').trim().isNotEmpty) _phoneController.text = extracted.phoneNumber!.trim();
+          if ((extracted.email ?? '').trim().isNotEmpty) _emailController.text = extracted.email!.trim();
+          if ((extracted.address ?? '').trim().isNotEmpty) _addressController.text = extracted.address!.trim();
+          setState(() {});
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Text extracted from image. Edit if needed, then save.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } on PlatformException catch (e) {
       if (mounted) {

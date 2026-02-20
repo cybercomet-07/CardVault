@@ -83,8 +83,9 @@ class _CaptureCardDialogState extends State<_CaptureCardDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Allow camera access when your browser or device prompts you. '
-            'Then tap Capture to take a photo of your business card.',
+            'CardVault needs camera access to capture your card. '
+            'Tap "Open camera" below — your browser or device will ask for permission. '
+            'After you allow, the camera will open to take the photo.',
             style: textTheme.bodyMedium?.copyWith(color: Colors.white70),
           ),
           if (_error != null) ...[
@@ -125,7 +126,7 @@ class _CaptureCardDialogState extends State<_CaptureCardDialog> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.camera_alt_rounded, size: 20),
-          label: Text(_isCapturing ? 'Opening camera...' : 'Capture'),
+          label: Text(_isCapturing ? 'Opening camera...' : 'Open camera'),
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.accentIndigo,
             foregroundColor: Colors.white,

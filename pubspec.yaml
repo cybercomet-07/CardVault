@@ -17,6 +17,7 @@ dependencies:
   cloud_firestore: ^5.4.4
   firebase_storage: ^12.3.4
   image_picker: ^1.0.7
+  google_mlkit_text_recognition: ^0.13.0
 
 dev_dependencies:
   flutter_test:
