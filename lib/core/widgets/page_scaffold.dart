@@ -12,6 +12,7 @@ class GradientBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Stack(
+      fit: StackFit.expand,
       children: [
         const Positioned.fill(child: SplineBackground()),
         Positioned.fill(
