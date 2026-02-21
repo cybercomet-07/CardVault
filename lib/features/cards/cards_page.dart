@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:card_vault/core/models/vault_card.dart';
+import 'package:card_vault/core/router/app_router.dart';
 import 'package:card_vault/core/services/card_ocr_service_stub.dart'
     if (dart.library.io) 'package:card_vault/core/services/card_ocr_service_io.dart'
     if (dart.library.html) 'package:card_vault/core/services/card_ocr_service_web.dart' as card_ocr;
@@ -469,6 +470,11 @@ class _CardsPageState extends State<CardsPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: _MobileSectionNav(currentRoute: AppRouter.cards),
+                    ),
+                    const SizedBox(height: 12),
                     SizedBox(
                       height: 360,
                       child: _buildRecentCardsPanel(),
@@ -704,6 +710,103 @@ class _CardsPageState extends State<CardsPage> {
         if (value == null) return;
         setState(() => _selectedBusinessType = value);
       },
+    );
+  }
+}
+
+class _MobileSectionNav extends StatelessWidget {
+  const _MobileSectionNav({required this.currentRoute});
+
+  final String currentRoute;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassContainer(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: _MobileSectionNavItem(
+              label: 'Dashboard',
+              icon: Icons.dashboard_rounded,
+              isActive: currentRoute == AppRouter.dashboard,
+              onTap: () => _go(context, AppRouter.dashboard),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _MobileSectionNavItem(
+              label: 'Cards',
+              icon: Icons.credit_card_rounded,
+              isActive: currentRoute == AppRouter.cards,
+              onTap: () => _go(context, AppRouter.cards),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _MobileSectionNavItem(
+              label: 'Settings',
+              icon: Icons.settings_rounded,
+              isActive: currentRoute == AppRouter.settings,
+              onTap: () => _go(context, AppRouter.settings),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _go(BuildContext context, String route) {
+    if (route == currentRoute) return;
+    Navigator.pushReplacementNamed(context, route);
+  }
+}
+
+class _MobileSectionNavItem extends StatelessWidget {
+  const _MobileSectionNavItem({
+    required this.label,
+    required this.icon,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = isActive ? Colors.white : Colors.white70;
+    return Material(
+      color: isActive
+          ? AppColors.accentIndigo.withValues(alpha: 0.9)
+          : AppColors.surfaceSecondary.withValues(alpha: 0.55),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: fg),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: fg,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

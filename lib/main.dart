@@ -12,8 +12,8 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   if (kIsWeb) {
-    // Require login again when browser is fully closed.
-    await FirebaseAuth.instance.setPersistence(Persistence.SESSION);
+    // Keep auth only in-memory on web so reopening the link asks login again.
+    await FirebaseAuth.instance.setPersistence(Persistence.NONE);
   }
   runApp(const CardVaultApp());
 }
