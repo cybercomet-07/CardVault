@@ -75,6 +75,19 @@ sequenceDiagram
     Firestore-->>App: Profile persisted
 ```
 
+### Authentication flow (state view)
+
+```mermaid
+flowchart TD
+    A[App Launch] --> B{Authenticated session exists?}
+    B -- No --> C[Login / Register Screen]
+    C --> D[Firebase Auth request]
+    D --> E[Auth success]
+    E --> F[Upsert user profile in Firestore]
+    F --> G[Dashboard]
+    B -- Yes --> G
+```
+
 ## 4.2 Capture/upload + OCR + save flow
 
 ```mermaid
@@ -94,6 +107,22 @@ sequenceDiagram
     Cloudinary-->>App: secure image URL
     App->>Firestore: Save card + imageUrl + metadata
     Firestore-->>App: Save complete
+```
+
+### Capture/upload + save flow (state view)
+
+```mermaid
+flowchart TD
+    A[User taps Capture or Upload] --> B[Pick image bytes]
+    B --> C[Run OCR engine]
+    C --> D[Parse extracted text into fields]
+    D --> E[Prefill editable form]
+    E --> F{User confirms save}
+    F -- No --> E
+    F -- Yes --> G[Upload image to Cloudinary]
+    G --> H[Receive secure image URL]
+    H --> I[Write card document to Firestore]
+    I --> J[Refresh dashboard/cards view]
 ```
 
 ## 4.3 Dashboard flow
