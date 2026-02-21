@@ -5,11 +5,15 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 
 import 'package:card_vault/core/models/extracted_card_data.dart';
 import 'package:card_vault/core/services/card_text_parser.dart';
+import 'package:card_vault/core/services/paddle_ocr_service.dart';
 
 /// Extracts text from a card image using ML Kit and parses into structured fields.
 /// Used on Android/iOS only; on web use the stub.
 Future<ExtractedCardData?> extractCardTextFromImage(Uint8List imageBytes) async {
   try {
+    final paddleResult = await PaddleOcrService.extractCardTextFromImage(imageBytes);
+    if (paddleResult != null) return paddleResult;
+
     final tempFile = File('${Directory.systemTemp.path}/cardvault_ocr_${DateTime.now().millisecondsSinceEpoch}.jpg');
     await tempFile.writeAsBytes(imageBytes);
     try {

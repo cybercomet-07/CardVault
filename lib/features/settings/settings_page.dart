@@ -1,26 +1,157 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
+import 'package:card_vault/core/models/user_profile.dart';
 import 'package:card_vault/core/router/app_router.dart';
+import 'package:card_vault/core/services/storage_card_service.dart';
+import 'package:card_vault/core/services/user_profile_service.dart';
 import 'package:card_vault/core/theme/app_theme.dart';
 import 'package:card_vault/core/widgets/glass_container.dart';
 import 'package:card_vault/core/widgets/page_scaffold.dart';
 import 'package:card_vault/core/widgets/primary_button.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  final _userProfileService = UserProfileService();
+  final _storageService = StorageCardService();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _companyController = TextEditingController();
+  bool _saving = false;
+  String? _photoUrl;
+  UserProfile? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _companyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final profile = await _userProfileService.getProfile(user.uid);
+    final resolved = profile ??
+        UserProfile(
+          uid: user.uid,
+          fullName: user.displayName,
+          email: user.email,
+          photoUrl: user.photoURL,
+          themeMode: 'dark',
+        );
+    _profile = resolved;
+    _nameController.text = resolved.fullName ?? '';
+    _phoneController.text = resolved.phone ?? '';
+    _companyController.text = resolved.company ?? '';
+    _photoUrl = resolved.photoUrl ?? user.photoURL;
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _pickProfilePhoto() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 600,
+        maxHeight: 600,
+        imageQuality: 88,
+      );
+      if (picked == null) return;
+      setState(() => _saving = true);
+      final bytes = await picked.readAsBytes();
+      final url = await _storageService.uploadProfileImage(
+        userId: user.uid,
+        bytes: bytes,
+      );
+      await user.updatePhotoURL(url);
+      _photoUrl = url;
+      await _userProfileService.upsertProfile(
+        (_profile ?? UserProfile(uid: user.uid)).copyWith(photoUrl: url),
+      );
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile photo updated')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update photo: $e')),
+      );
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    setState(() => _saving = true);
+    try {
+      final fullName = _nameController.text.trim();
+      final phone = _phoneController.text.trim();
+      final company = _companyController.text.trim();
+      if (fullName.isNotEmpty) {
+        await user.updateDisplayName(fullName);
+      }
+      await _userProfileService.upsertProfile(
+        UserProfile(
+          uid: user.uid,
+          fullName: fullName,
+          email: user.email,
+          phone: phone,
+          company: company,
+          photoUrl: _photoUrl ?? user.photoURL,
+          themeMode: 'dark',
+        ),
+      );
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save profile: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final secondaryTextColor = isDark
+        ? Colors.white70
+        : colorScheme.onSurface.withValues(alpha: 0.72);
+    final fieldFill = isDark
+        ? AppColors.surfaceSecondary.withValues(alpha: 0.62)
+        : Colors.white.withValues(alpha: 0.96);
     final user = FirebaseAuth.instance.currentUser;
     final displayName = user?.displayName?.trim();
     final email = user?.email ?? '';
 
     return PageScaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -31,13 +162,32 @@ class SettingsPage extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Settings',
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor:
-                            AppColors.accentIndigo.withValues(alpha: 0.6),
-                        child: const Icon(Icons.person_rounded),
+                      GestureDetector(
+                        onTap: _saving ? null : _pickProfilePhoto,
+                        child: CircleAvatar(
+                          radius: 28,
+                          backgroundColor:
+                              AppColors.accentIndigo.withValues(alpha: 0.6),
+                          backgroundImage:
+                              (_photoUrl != null && _photoUrl!.isNotEmpty)
+                                  ? NetworkImage(_photoUrl!)
+                                  : null,
+                          child: (_photoUrl == null || _photoUrl!.isEmpty)
+                              ? const Icon(Icons.person_rounded)
+                              : null,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Column(
@@ -51,39 +201,46 @@ class SettingsPage extends StatelessWidget {
                           ),
                           Text(
                             email.isNotEmpty ? email : 'Not signed in',
-                            style: textTheme.bodySmall
-                                ?.copyWith(color: Colors.white70),
+                            style:
+                                textTheme.bodySmall?.copyWith(color: secondaryTextColor),
                           ),
                         ],
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      const Icon(Icons.dark_mode_rounded),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Theme',
-                              style: textTheme.bodyMedium,
-                            ),
-                            Text(
-                              'Dark / Light',
-                              style: textTheme.bodySmall
-                                  ?.copyWith(color: Colors.white70),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Switch(
-                        value: true,
-                        onChanged: (_) {},
-                      ),
-                    ],
+                  TextField(
+                    controller: _nameController,
+                    style: TextStyle(color: colorScheme.onSurface),
+                    decoration: InputDecoration(
+                      labelText: 'Full name',
+                      filled: true,
+                      fillColor: fieldFill,
+                      labelStyle: TextStyle(color: secondaryTextColor),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _phoneController,
+                    style: TextStyle(color: colorScheme.onSurface),
+                    decoration: InputDecoration(
+                      labelText: 'Phone',
+                      filled: true,
+                      fillColor: fieldFill,
+                      labelStyle: TextStyle(color: secondaryTextColor),
+                    ),
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _companyController,
+                    style: TextStyle(color: colorScheme.onSurface),
+                    decoration: InputDecoration(
+                      labelText: 'Company',
+                      filled: true,
+                      fillColor: fieldFill,
+                      labelStyle: TextStyle(color: secondaryTextColor),
+                    ),
                   ),
                   const SizedBox(height: 24),
                   Align(
@@ -92,6 +249,20 @@ class SettingsPage extends StatelessWidget {
                       'Account',
                       style: textTheme.titleMedium,
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  PrimaryButton(
+                    label: _saving ? 'Saving...' : 'Save profile',
+                    icon: _saving ? null : Icons.save_rounded,
+                    onPressed: _saving ? null : _saveProfile,
+                  ),
+                  const SizedBox(height: 12),
+                  PrimaryButton(
+                    label: 'Back to dashboard',
+                    icon: Icons.dashboard_rounded,
+                    onPressed: () {
+                      Navigator.pushReplacementNamed(context, AppRouter.dashboard);
+                    },
                   ),
                   const SizedBox(height: 12),
                   PrimaryButton(

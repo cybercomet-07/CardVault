@@ -422,13 +422,28 @@ class _CardsPageState extends State<CardsPage> {
   @override
   Widget build(BuildContext context) {
     return PageScaffold(
-      appBar: AppBar(title: const Text('Cards')),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final split = constraints.maxWidth >= 900;
-          return Flex(
-            direction: split ? Axis.horizontal : Axis.vertical,
-            children: [
+      body: Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Cards',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final split = constraints.maxWidth >= 900;
+                  return Flex(
+                    direction: split ? Axis.horizontal : Axis.vertical,
+                    children: [
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -580,9 +595,13 @@ class _CardsPageState extends State<CardsPage> {
                   ),
                 ),
               ),
-            ],
-          );
-        },
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

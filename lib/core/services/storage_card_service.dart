@@ -30,6 +30,27 @@ class StorageCardService {
     throw Exception('Cloudinary upload failed after retry.');
   }
 
+  Future<String> uploadProfileImage({
+    required String userId,
+    required Uint8List bytes,
+  }) async {
+    final profileId = 'profile_${DateTime.now().millisecondsSinceEpoch}';
+    final firstTry = await _upload(
+      bytes: bytes,
+      cardId: profileId,
+      folder: 'cardvault/profiles/$userId',
+    );
+    if (firstTry != null) return firstTry;
+
+    final secondTry = await _upload(
+      bytes: bytes,
+      cardId: profileId,
+    );
+    if (secondTry != null) return secondTry;
+
+    throw Exception('Cloudinary profile upload failed after retry.');
+  }
+
   Future<String?> _upload({
     required Uint8List bytes,
     required String cardId,

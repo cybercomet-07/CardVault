@@ -1,245 +1,209 @@
-# ARCHITECTURE.md — CardVault (Visiting Card Manager)
+# ARCHITECTURE.md — CardVault
 
-## 1. Project Overview
+## 1) System goal
 
-CardVault is a Flutter-based mobile application that allows users to digitize and manage visiting cards. The application enables users to upload or capture an image of a visiting card, extract text using OCR, edit the extracted details, and store the structured information securely in Firebase.
+CardVault digitizes business cards by combining:
 
-The system is built without a custom backend server. Instead, it uses Firebase as a Backend-as-a-Service (BaaS), ensuring fast development, scalability, and secure data handling.
+- image capture/upload,
+- OCR-based field extraction,
+- editable review,
+- secure cloud persistence,
+- dashboard analytics and card browsing.
 
----
+It is designed as a Flutter-first client architecture with managed cloud services.
 
-## 2. High-Level Architecture
+## 2) High-level architecture
+
+```mermaid
+flowchart LR
+    U[User] --> APP[Flutter App]
+
+    APP --> AUTH[Firebase Authentication]
+    APP --> DB[Cloud Firestore]
+    APP --> IMG[Cloudinary]
+
+    APP --> OCRM[ML Kit OCR - Mobile]
+    APP --> OCRW[Tesseract.js OCR - Web]
+    OCRM --> PARSER[Card Text Parser]
+    OCRW --> PARSER
+    PARSER --> APP
+```
+
+## 3) Runtime architecture (client layers)
 
 ```mermaid
 flowchart TD
-    A[Flutter Mobile App] --> B[Firebase Authentication]
-    A --> C[Google ML Kit OCR]
-    A --> D[Firebase Storage]
-    A --> E[Cloud Firestore Database]
-    B --> E
-    D --> E
+    UI[Feature Pages] --> CORE[Core Services]
+    CORE --> MODELS[Core Models]
+    CORE --> EXT[External Services]
+    EXT --> AUTH[Firebase Auth]
+    EXT --> FIRESTORE[Cloud Firestore]
+    EXT --> CLOUDINARY[Cloudinary]
 ```
 
----
+### 3.1 Feature layer (`lib/features/*`)
 
-## 3. System Components
+- `auth`: login/register flows and account onboarding
+- `cards`: add/edit/list/details flows
+- `dashboard`: overview, active cards, vault images, insights graph
+- `settings`: editable profile + theme mode
+- `splash`: session routing
 
-### 3.1 Flutter Application
-The Flutter app is responsible for:
-- Rendering UI screens
-- Handling user interaction
-- Capturing or selecting card images
-- Running OCR locally
-- Displaying editable forms
-- Performing search queries
-- Communicating with Firebase services
+### 3.2 Core layer (`lib/core/*`)
 
----
+- `models`: `VaultCard`, `ExtractedCardData`, `UserProfile`
+- `services`: OCR, parser, Firestore, storage, profile services
+- `router`: centralized app navigation
+- `widgets`: shared scaffolding, buttons, glass containers, capture modal
+- `theme`: dark/light theme setup
 
-### 3.2 Firebase Authentication
-- Manages user login and registration.
-- Generates a unique `userId` for each user.
-- Ensures data isolation so users can only access their own cards.
+## 4) Key data flows
 
----
+## 4.1 Authentication flow
 
-### 3.3 Google ML Kit (On-Device OCR)
-- Extracts text from visiting card images.
-- Runs locally on the device.
-- No external server call required.
-- Reduces cost and improves speed.
+```mermaid
+sequenceDiagram
+    participant User
+    participant App
+    participant FirebaseAuth
+    participant Firestore
 
----
+    User->>App: Register / Login
+    App->>FirebaseAuth: Auth request
+    FirebaseAuth-->>App: UID + session
+    App->>Firestore: Create/update profile doc
+    Firestore-->>App: Profile persisted
+```
 
-### 3.4 Firebase Storage
-- Stores uploaded visiting card images.
-- Returns a public image URL.
-- That URL is saved inside Firestore for future access.
+## 4.2 Capture/upload + OCR + save flow
 
----
+```mermaid
+sequenceDiagram
+    participant User
+    participant App
+    participant OCR as OCR Engine
+    participant Cloudinary
+    participant Firestore
 
-### 3.5 Cloud Firestore
-- Stores structured visiting card data.
-- Uses document-based storage.
-- Supports scalable querying.
-- Enables keyword-based search.
+    User->>App: Capture or upload card image
+    App->>OCR: Extract text (platform specific)
+    OCR-->>App: Raw OCR text
+    App->>App: Parse & infer structured fields
+    User->>App: Review/edit extracted fields
+    App->>Cloudinary: Upload image
+    Cloudinary-->>App: secure image URL
+    App->>Firestore: Save card + imageUrl + metadata
+    Firestore-->>App: Save complete
+```
 
----
-
-## 4. Application Flow
-
-### 4.1 Authentication Flow
+## 4.3 Dashboard flow
 
 ```mermaid
 flowchart TD
-    A[User Opens App] --> B{Is User Logged In?}
-    B -- No --> C[Login / Signup Screen]
-    C --> D[Firebase Authentication]
-    D --> E[Home Screen]
-    B -- Yes --> E[Home Screen]
+    A[Dashboard Open] --> B[Read user's cards]
+    B --> C[Compute totals and type distribution]
+    C --> D[Render list + chart + insights]
+    D --> E[Active cards details]
+    D --> F[Vault image gallery]
 ```
 
----
+## 5) OCR architecture
 
-### 4.2 Card Upload and OCR Flow
+### Mobile
 
-```mermaid
-flowchart TD
-    A[User Clicks Add Card] --> B[Select or Capture Image]
-    B --> C[Run OCR using ML Kit]
-    C --> D[Extract Raw Text]
-    D --> E[Parse Text using Regex]
-    E --> F[Auto-Fill Editable Form]
-    F --> G[User Edits and Confirms]
-    G --> H[Upload Image to Firebase Storage]
-    H --> I[Receive Image URL]
-    I --> J[Save Card Data to Firestore]
-    J --> K[Return to Home Screen]
+- `card_ocr_service_io.dart`
+- Google ML Kit reads text from local image bytes.
+
+### Web
+
+- `card_ocr_service_web.dart` + `web/index.html`
+- Tesseract.js runs multi-pass recognition on preprocessed image variants.
+
+### Shared parser
+
+- `card_text_parser.dart`
+- Converts raw OCR text into:
+  - person name
+  - company
+  - phone
+  - email
+  - website
+  - address
+  - business type
+
+## 6) Storage architecture
+
+### Identity and metadata
+
+- Firebase Authentication: user identity/session
+- Firestore:
+  - `cards` documents
+  - `users` profile documents
+
+### Image assets
+
+- Cloudinary stores card/profile images.
+- Firestore stores URL pointer (`imageUrl`/`photoUrl`) for rendering.
+
+## 7) Firestore model snapshot
+
+### `cards` (representative fields)
+
+- `userId`
+- `personName`
+- `companyName`
+- `designation`
+- `phoneNumber`
+- `email`
+- `website`
+- `address`
+- `businessType`
+- `notes`
+- `imageUrl`
+- `createdAt`
+
+### `users`
+
+- `uid`
+- `fullName`
+- `email`
+- `phone`
+- `company`
+- `photoUrl`
+- `themeMode`
+
+## 8) Security model
+
+- User-bound data ownership through Firebase UID.
+- Card/profile operations are scoped to authenticated user context.
+- Intended Firestore rules pattern:
+
+```text
+allow read, write: if request.auth != null
+                   && request.auth.uid == resource.data.userId;
 ```
 
----
+## 9) Deployment model
 
-### 4.3 Search Flow
+- Client: Flutter app (web + mobile)
+- Managed services:
+  - Firebase Auth
+  - Cloud Firestore
+  - Cloudinary
+- Optional extension:
+  - OCR backend endpoint (future, for higher-accuracy server-side OCR)
 
-```mermaid
-flowchart TD
-    A[User Types in Search Bar] --> B[Convert Query to Lowercase]
-    B --> C[Query Firestore using searchKeywords]
-    C --> D[Receive Matching Cards]
-    D --> E[Display Filtered Results]
-```
+## 10) Technical constraints and future improvements
 
----
+Current constraints:
 
-## 5. Firestore Data Model
+- OCR remains probabilistic on low-quality/angled images.
+- Web camera/upload behavior depends on browser APIs.
 
-Collection Name: `cards`
+Planned improvements:
 
-Each document structure:
-
-cards/
-   cardId/
-      userId: string
-      name: string
-      company: string
-      designation: string
-      phoneNumbers: array
-      emails: array
-      address: string
-      rawExtractedText: string
-      imageUrl: string
-      searchKeywords: array
-      createdAt: timestamp
-
----
-
-## 6. Search Strategy
-
-To enable flexible searching across multiple fields:
-
-When saving a card:
-- All text fields are converted to lowercase.
-- Words are split and stored in `searchKeywords` array.
-- Includes name, company, phone numbers, emails, and extracted text.
-
-Example:
-
-searchKeywords:
-[
-  "john",
-  "doe",
-  "abc",
-  "pvt",
-  "ltd",
-  "9876543210",
-  "john@gmail.com"
-]
-
-Search query:
-
-.where("searchKeywords", arrayContains: searchText)
-
-This allows searching by:
-- Name
-- Company
-- Phone
-- Email
-- Any keyword from OCR text
-
----
-
-## 7. Security Model
-
-Each card document contains:
-
-userId = FirebaseAuth.currentUser.uid
-
-Firestore Security Rule Concept:
-
-allow read, write: if request.auth.uid == resource.data.userId;
-
-This ensures:
-- Users can only access their own cards.
-- No cross-user data exposure.
-- Secure multi-user architecture.
-
----
-
-## 8. Folder Structure
-
-lib/
- ├── main.dart
- ├── screens/
- │     ├── login_screen.dart
- │     ├── home_screen.dart
- │     ├── add_card_screen.dart
- │     ├── detail_screen.dart
- │     └── profile_screen.dart
- ├── services/
- │     ├── auth_service.dart
- │     ├── firestore_service.dart
- │     ├── storage_service.dart
- │     └── ocr_service.dart
- ├── models/
- │     └── card_model.dart
- ├── widgets/
- │     └── card_tile.dart
-
----
-
-## 9. Scalability Considerations
-
-Future improvements may include:
-- AI-based smart field classification
-- Duplicate card detection
-- Contact export (.vcf)
-- Cloud full-text search integration
-- Tag-based grouping
-- Contact sharing features
-
----
-
-## 10. Engineering Principles Followed
-
-- Clean separation of UI and business logic.
-- Service-based architecture.
-- Secure user data isolation.
-- Editable OCR workflow before saving.
-- Scalable Firestore structure.
-- Modular and maintainable folder structure.
-
----
-
-## Final Summary
-
-CardVault replaces physical visiting cards with a digital, searchable, cloud-based system.
-
-The architecture ensures:
-- Secure authentication
-- Structured storage
-- Efficient search
-- Editable OCR extraction
-- Clean engineering practices
-- Scalable Firebase-based backend
-
-This design prioritizes clarity, maintainability, and scalability within a 4–5 day development timeline.
+- confidence-based field validation,
+- perspective correction before OCR,
+- server-side OCR fallback pipeline,
+- improved search ranking and duplicate detection,
+- CI checks and integration test suite.

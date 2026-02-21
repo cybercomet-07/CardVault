@@ -14,6 +14,49 @@ class AppColors {
 class AppTheme {
   AppTheme._();
 
+  static ThemeData get light {
+    final base = ThemeData.light();
+    final textTheme = GoogleFonts.interTextTheme(base.textTheme);
+
+    return base.copyWith(
+      scaffoldBackgroundColor: const Color(0xFFF4F7FF),
+      colorScheme: base.colorScheme.copyWith(
+        primary: AppColors.accentIndigo,
+        secondary: AppColors.accentPurple,
+        surface: Colors.white,
+      ),
+      textTheme: textTheme,
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.95),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
   static ThemeData get dark {
     final base = ThemeData.dark();
     final textTheme = GoogleFonts.interTextTheme(base.textTheme);

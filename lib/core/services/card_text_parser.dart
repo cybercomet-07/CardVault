@@ -7,6 +7,7 @@ ExtractedCardData parseCardText(String text) {
       .split(RegExp(r'\r?\n'))
       .map((s) => _normalizeLine(s))
       .where((s) => s.isNotEmpty)
+      .toSet()
       .toList();
   if (rawLines.isEmpty) return const ExtractedCardData();
 
@@ -19,7 +20,7 @@ ExtractedCardData parseCardText(String text) {
   );
 
   String? website;
-  String? address;
+  final addressParts = <String>[];
   final otherLines = <String>[];
 
   final phoneRegex = RegExp(
@@ -37,41 +38,58 @@ ExtractedCardData parseCardText(String text) {
     final websiteMatch = websiteRegex.firstMatch(line);
 
     if (phoneMatch != null && phoneNumber == null) {
-      phoneNumber = phoneMatch.group(0)?.trim();
+      phoneNumber = _cleanPhone(phoneMatch.group(0)?.trim());
     } else if (emailMatch != null && email == null) {
-      email = emailMatch.group(0)?.trim();
+      email = emailMatch.group(0)?.trim().toLowerCase();
     } else if (websiteMatch != null && website == null) {
       website = websiteMatch.group(0)?.trim();
-    } else if (address == null &&
-        (addressHints.hasMatch(line) || RegExp(r'\d{2,}').hasMatch(line))) {
-      address = line;
+    } else if (addressHints.hasMatch(line) || RegExp(r'\d{2,}').hasMatch(line)) {
+      addressParts.add(line);
     } else {
       otherLines.add(line);
     }
   }
 
-  final candidates = otherLines.where(_looksLikeNameOrCompany).toList();
+  final candidates = otherLines
+      .where(_looksLikeNameOrCompany)
+      .where((line) => !_looksLikeRoleOrTagline(line))
+      .toList();
   String? personName;
   String? companyName;
 
   if (candidates.isNotEmpty) {
-    personName = candidates.first;
-    if (candidates.length >= 2) {
-      companyName = candidates[1];
-    } else if (rawLines.length >= 2) {
-      companyName = rawLines[1];
-    }
+    personName = candidates.firstWhere(
+      _looksLikePersonName,
+      orElse: () => candidates.first,
+    );
+    companyName = candidates.firstWhere(
+      (line) => line != personName && _looksLikeCompanyName(line),
+      orElse: () => candidates.length >= 2 ? candidates[1] : '',
+    );
+    if (companyName.isEmpty) companyName = null;
   } else if (rawLines.isNotEmpty) {
-    personName = rawLines.first;
+    personName = rawLines.firstWhere(
+      _looksLikePersonName,
+      orElse: () => rawLines.first,
+    );
   }
 
-  if ((address == null || address.isEmpty) && otherLines.length >= 3) {
+  if (addressParts.length > 1) {
+    addressParts.removeWhere((line) => phoneRegex.hasMatch(line) || emailRegex.hasMatch(line));
+  }
+  String? address;
+  if (addressParts.isNotEmpty) {
+    address = addressParts.take(3).join(', ');
+  } else if (otherLines.length >= 3) {
     address = otherLines.skip(2).take(2).join(', ');
   }
 
   final inferredCompany = _companyFromEmailOrWebsite(email, website);
   if ((companyName == null || _isLikelyNoisy(companyName)) && inferredCompany != null) {
     companyName = inferredCompany;
+  }
+  if (personName != null && companyName != null && _looksSameWordShape(personName, companyName)) {
+    personName = null;
   }
 
   return ExtractedCardData(
@@ -95,6 +113,8 @@ ExtractedCardData parseCardText(String text) {
 String _normalizeLine(String input) {
   final normalized = input
       .replaceAll(RegExp(r'[^\x20-\x7E]'), ' ')
+      .replaceAll('|', 'I')
+      .replaceAll('`', '\'')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
   return normalized;
@@ -123,10 +143,12 @@ String? _cleanOutput(String? value) {
   if (value == null) return null;
   final v = value
       .replaceAll(RegExp("[^A-Za-z0-9@&+.,:/()\\-' ]"), ' ')
+      .replaceAll(RegExp(r'\b([A-Za-z])\s+([A-Za-z])\s+([A-Za-z])\b'), r'$1$2$3')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
   if (v.isEmpty) return null;
   if (RegExp(r'[A-Za-z]').allMatches(v).length < 2) return null;
+  if (_looksLikeRoleOrTagline(v)) return null;
   return v;
 }
 
@@ -153,6 +175,52 @@ String? _companyFromEmailOrWebsite(String? email, String? website) {
   final label = host.split('.').first;
   if (label.isEmpty) return null;
   return label[0].toUpperCase() + label.substring(1).toLowerCase();
+}
+
+bool _looksLikePersonName(String line) {
+  if (_looksLikeRoleOrTagline(line)) return false;
+  final words = line.split(' ').where((w) => w.isNotEmpty).toList();
+  if (words.length < 2 || words.length > 4) return false;
+  return words.every((w) => RegExp("^[A-Za-z][A-Za-z'-]{1,}\$").hasMatch(w));
+}
+
+bool _looksLikeCompanyName(String line) {
+  final lower = line.toLowerCase();
+  if (_looksLikeRoleOrTagline(line)) return false;
+  return lower.contains('tech') ||
+      lower.contains('solutions') ||
+      lower.contains('labs') ||
+      lower.contains('group') ||
+      lower.contains('private') ||
+      lower.contains('inc') ||
+      lower.contains('llc') ||
+      lower.contains('corp');
+}
+
+bool _looksLikeRoleOrTagline(String line) {
+  final lower = line.toLowerCase();
+  return lower.contains('manager') ||
+      lower.contains('director') ||
+      lower.contains('engineer') ||
+      lower.contains('consultant') ||
+      lower.contains('specialist') ||
+      lower.contains('marketing') ||
+      lower.contains('sales') ||
+      lower.contains('support');
+}
+
+bool _looksSameWordShape(String a, String b) {
+  final aa = a.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+  final bb = b.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+  if (aa.isEmpty || bb.isEmpty) return false;
+  return aa == bb || (aa.length > 5 && bb.length > 5 && (aa.contains(bb) || bb.contains(aa)));
+}
+
+String? _cleanPhone(String? value) {
+  if (value == null) return null;
+  final cleaned = value.replaceAll(RegExp(r'[^0-9+()\-.\s]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (cleaned.length < 8) return null;
+  return cleaned;
 }
 
 String _inferBusinessType({required String source}) {

@@ -15,16 +15,14 @@ class CardDetailsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (cardId == null || cardId!.isEmpty) {
-      return PageScaffold(
-        appBar: AppBar(title: const Text('Card details')),
-        body: const Center(child: Text('No card selected')),
+      return const PageScaffold(
+        body: Center(child: Text('No card selected')),
       );
     }
 
     final firestore = FirestoreCardService();
 
     return PageScaffold(
-      appBar: AppBar(title: const Text('Card details')),
       body: FutureBuilder<VaultCard?>(
         future: firestore.getCard(cardId!),
         builder: (context, snapshot) {
@@ -35,7 +33,21 @@ class CardDetailsPage extends StatelessWidget {
           if (card == null) {
             return const Center(child: Text('Card not found'));
           }
-          return _CardDetailsBody(card: card);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
+                child: Text(
+                  'Card details',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ),
+              Expanded(child: _CardDetailsBody(card: card)),
+            ],
+          );
         },
       ),
     );

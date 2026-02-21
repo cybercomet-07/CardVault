@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:card_vault/core/router/app_router.dart';
+import 'package:card_vault/core/models/user_profile.dart';
+import 'package:card_vault/core/services/storage_card_service.dart';
+import 'package:card_vault/core/services/user_profile_service.dart';
 import 'package:card_vault/core/theme/app_theme.dart';
 import 'package:card_vault/core/widgets/glass_container.dart';
 import 'package:card_vault/core/widgets/page_scaffold.dart';
@@ -18,6 +21,8 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage>
     with TickerProviderStateMixin {
+  final _userProfileService = UserProfileService();
+  final _storageService = StorageCardService();
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -43,10 +48,8 @@ class _RegisterPageState extends State<RegisterPage>
 
   late final AnimationController _fadeController;
   late final Animation<double> _fadeAnimation;
-  late final AnimationController _bgController;
-  late final Animation<double> _bgAnimation;
 
-  static const double _fieldSpacing = 18.0;
+  static const double _fieldSpacing = 14.0;
 
   @override
   void initState() {
@@ -58,14 +61,6 @@ class _RegisterPageState extends State<RegisterPage>
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
       curve: Curves.easeOut,
-    );
-    _bgController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 8),
-    )..repeat(reverse: true);
-    _bgAnimation = CurvedAnimation(
-      parent: _bgController,
-      curve: Curves.easeInOut,
     );
     _fadeController.forward();
     _passwordController.addListener(() => setState(() {}));
@@ -87,7 +82,6 @@ class _RegisterPageState extends State<RegisterPage>
     _passwordFocus.dispose();
     _confirmPasswordFocus.dispose();
     _fadeController.dispose();
-    _bgController.dispose();
     super.dispose();
   }
 
@@ -159,6 +153,8 @@ class _RegisterPageState extends State<RegisterPage>
 
     final fullName = _fullNameController.text.trim();
     final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
+    final company = _companyController.text.trim();
     final password = _passwordController.text;
 
     setState(() => _isLoading = true);
@@ -169,6 +165,28 @@ class _RegisterPageState extends State<RegisterPage>
       );
       if (credential.user != null && fullName.isNotEmpty) {
         await credential.user!.updateDisplayName(fullName);
+      }
+      String? photoUrl;
+      if (_pickedImage != null && credential.user != null) {
+        final photoBytes = await _pickedImage!.readAsBytes();
+        photoUrl = await _storageService.uploadProfileImage(
+          userId: credential.user!.uid,
+          bytes: photoBytes,
+        );
+        await credential.user!.updatePhotoURL(photoUrl);
+      }
+      if (credential.user != null) {
+        await _userProfileService.upsertProfile(
+          UserProfile(
+            uid: credential.user!.uid,
+            fullName: fullName,
+            email: email,
+            phone: phone,
+            company: company,
+            photoUrl: photoUrl,
+            themeMode: 'dark',
+          ),
+        );
       }
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -199,39 +217,16 @@ class _RegisterPageState extends State<RegisterPage>
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 800;
-    final cardWidth = isWide ? 480.0 : double.infinity;
+    final size = MediaQuery.of(context).size;
+    final isWide = size.width >= 800;
+    final isDesktop = size.width >= 1024;
+    final cardWidth = isDesktop ? 920.0 : (isWide ? 560.0 : double.infinity);
     final textTheme = Theme.of(context).textTheme;
     final passwordStrength = _passwordStrength(_passwordController.text);
 
     return PageScaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          'CardVault',
-          style: textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.2,
-            color: Colors.white,
-            shadows: [
-              Shadow(
-                color: AppColors.accentIndigo.withValues(alpha: 0.6),
-                blurRadius: 12,
-                offset: const Offset(0, 0),
-              ),
-              Shadow(
-                color: AppColors.accentPurple.withValues(alpha: 0.4),
-                blurRadius: 24,
-                offset: const Offset(0, 0),
-              ),
-            ],
-          ),
-        ),
-      ),
       body: Stack(
         children: [
-          _AnimatedGradientBackground(animation: _bgAnimation),
           Center(
             child: FadeTransition(
               opacity: _fadeAnimation,
@@ -239,14 +234,15 @@ class _RegisterPageState extends State<RegisterPage>
                 child: Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal: isWide ? 24 : 16,
-                    vertical: 24,
+                    vertical: isDesktop ? 14 : 20,
                   ),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: cardWidth),
-                    child: GlassContainer(
-                      padding: const EdgeInsets.all(28),
-                      borderRadius: 20,
-                      child: Form(
+                    child: _AuthCardShell(
+                      child: GlassContainer(
+                        padding: EdgeInsets.all(isDesktop ? 22 : 24),
+                        borderRadius: 20,
+                        child: Form(
                         key: _formKey,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -266,16 +262,19 @@ class _RegisterPageState extends State<RegisterPage>
                                 color: Colors.white70,
                               ),
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 16),
                             Center(
                               child: GestureDetector(
                                 onTap: _pickProfileImage,
                                 child: Stack(
                                   alignment: Alignment.bottomRight,
                                   children: [
-                                    _AvatarPreview(pickedImage: _pickedImage),
+                                    _AvatarPreview(
+                                      pickedImage: _pickedImage,
+                                      radius: isDesktop ? 36 : 40,
+                                    ),
                                     Container(
-                                      padding: const EdgeInsets.all(6),
+                                      padding: const EdgeInsets.all(5),
                                       decoration: BoxDecoration(
                                         color: AppColors.accentIndigo,
                                         shape: BoxShape.circle,
@@ -302,85 +301,254 @@ class _RegisterPageState extends State<RegisterPage>
                               ),
                             ),
                             const SizedBox(height: _fieldSpacing),
-                            _GlowTextField(
-                              controller: _fullNameController,
-                              focusNode: _fullNameFocus,
-                              label: 'Full Name',
-                              prefixIcon: Icons.person_outline_rounded,
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) {
-                                  return 'Please enter your full name';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: _fieldSpacing),
-                            _GlowTextField(
-                              controller: _emailController,
-                              focusNode: _emailFocus,
-                              label: 'Email',
-                              keyboardType: TextInputType.emailAddress,
-                              prefixIcon: Icons.email_outlined,
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) {
-                                  return 'Please enter your email';
-                                }
-                                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                    .hasMatch(v.trim())) {
-                                  return 'Please enter a valid email address';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: _fieldSpacing),
-                            _GlowTextField(
-                              controller: _phoneController,
-                              focusNode: _phoneFocus,
-                              label: 'Phone Number',
-                              keyboardType: TextInputType.phone,
-                              prefixIcon: Icons.phone_outlined,
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) {
-                                  return 'Please enter your phone number';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: _fieldSpacing),
-                            _GlowTextField(
-                              controller: _companyController,
-                              focusNode: _companyFocus,
-                              label: 'Company Name (optional)',
-                              prefixIcon: Icons.business_outlined,
-                            ),
-                            const SizedBox(height: _fieldSpacing),
-                            _GlowTextField(
-                              controller: _passwordController,
-                              focusNode: _passwordFocus,
-                              label: 'Password',
-                              obscureText: _obscurePassword,
-                              prefixIcon: Icons.lock_outline_rounded,
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  color: Colors.white54,
-                                  size: 22,
-                                ),
-                                onPressed: () => setState(
-                                    () => _obscurePassword = !_obscurePassword),
+                            if (isDesktop) ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _GlowTextField(
+                                      controller: _fullNameController,
+                                      focusNode: _fullNameFocus,
+                                      label: 'Full Name',
+                                      prefixIcon: Icons.person_outline_rounded,
+                                      validator: (v) {
+                                        if (v == null || v.trim().isEmpty) {
+                                          return 'Please enter your full name';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _GlowTextField(
+                                      controller: _emailController,
+                                      focusNode: _emailFocus,
+                                      label: 'Email',
+                                      keyboardType: TextInputType.emailAddress,
+                                      prefixIcon: Icons.email_outlined,
+                                      validator: (v) {
+                                        if (v == null || v.trim().isEmpty) {
+                                          return 'Please enter your email';
+                                        }
+                                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                            .hasMatch(v.trim())) {
+                                          return 'Please enter a valid email address';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                ],
                               ),
-                              validator: (v) {
-                                if (v == null || v.isEmpty) {
-                                  return 'Please enter a password';
-                                }
-                                if (v.length < 6) {
-                                  return 'Password must be at least 6 characters';
-                                }
-                                return null;
-                              },
-                            ),
+                              const SizedBox(height: _fieldSpacing),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _GlowTextField(
+                                      controller: _phoneController,
+                                      focusNode: _phoneFocus,
+                                      label: 'Phone Number',
+                                      keyboardType: TextInputType.phone,
+                                      prefixIcon: Icons.phone_outlined,
+                                      validator: (v) {
+                                        if (v == null || v.trim().isEmpty) {
+                                          return 'Please enter your phone number';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _GlowTextField(
+                                      controller: _companyController,
+                                      focusNode: _companyFocus,
+                                      label: 'Company Name (optional)',
+                                      prefixIcon: Icons.business_outlined,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: _fieldSpacing),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: _GlowTextField(
+                                      controller: _passwordController,
+                                      focusNode: _passwordFocus,
+                                      label: 'Password',
+                                      obscureText: _obscurePassword,
+                                      prefixIcon: Icons.lock_outline_rounded,
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          _obscurePassword
+                                              ? Icons.visibility_off_outlined
+                                              : Icons.visibility_outlined,
+                                          color: Colors.white54,
+                                          size: 22,
+                                        ),
+                                        onPressed: () => setState(
+                                          () => _obscurePassword = !_obscurePassword,
+                                        ),
+                                      ),
+                                      validator: (v) {
+                                        if (v == null || v.isEmpty) {
+                                          return 'Please enter a password';
+                                        }
+                                        if (v.length < 6) {
+                                          return 'Password must be at least 6 characters';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _GlowTextField(
+                                      controller: _confirmPasswordController,
+                                      focusNode: _confirmPasswordFocus,
+                                      label: 'Confirm Password',
+                                      obscureText: _obscureConfirmPassword,
+                                      prefixIcon: Icons.lock_outline_rounded,
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          _obscureConfirmPassword
+                                              ? Icons.visibility_off_outlined
+                                              : Icons.visibility_outlined,
+                                          color: Colors.white54,
+                                          size: 22,
+                                        ),
+                                        onPressed: () => setState(
+                                          () => _obscureConfirmPassword =
+                                              !_obscureConfirmPassword,
+                                        ),
+                                      ),
+                                      validator: (v) {
+                                        if (v == null || v.isEmpty) {
+                                          return 'Please confirm your password';
+                                        }
+                                        if (v != _passwordController.text) {
+                                          return 'Passwords do not match';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ] else ...[
+                              _GlowTextField(
+                                controller: _fullNameController,
+                                focusNode: _fullNameFocus,
+                                label: 'Full Name',
+                                prefixIcon: Icons.person_outline_rounded,
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) {
+                                    return 'Please enter your full name';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: _fieldSpacing),
+                              _GlowTextField(
+                                controller: _emailController,
+                                focusNode: _emailFocus,
+                                label: 'Email',
+                                keyboardType: TextInputType.emailAddress,
+                                prefixIcon: Icons.email_outlined,
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) {
+                                    return 'Please enter your email';
+                                  }
+                                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                      .hasMatch(v.trim())) {
+                                    return 'Please enter a valid email address';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: _fieldSpacing),
+                              _GlowTextField(
+                                controller: _phoneController,
+                                focusNode: _phoneFocus,
+                                label: 'Phone Number',
+                                keyboardType: TextInputType.phone,
+                                prefixIcon: Icons.phone_outlined,
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) {
+                                    return 'Please enter your phone number';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: _fieldSpacing),
+                              _GlowTextField(
+                                controller: _companyController,
+                                focusNode: _companyFocus,
+                                label: 'Company Name (optional)',
+                                prefixIcon: Icons.business_outlined,
+                              ),
+                              const SizedBox(height: _fieldSpacing),
+                              _GlowTextField(
+                                controller: _passwordController,
+                                focusNode: _passwordFocus,
+                                label: 'Password',
+                                obscureText: _obscurePassword,
+                                prefixIcon: Icons.lock_outline_rounded,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    color: Colors.white54,
+                                    size: 22,
+                                  ),
+                                  onPressed: () => setState(
+                                    () => _obscurePassword = !_obscurePassword,
+                                  ),
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) {
+                                    return 'Please enter a password';
+                                  }
+                                  if (v.length < 6) {
+                                    return 'Password must be at least 6 characters';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: _fieldSpacing),
+                              _GlowTextField(
+                                controller: _confirmPasswordController,
+                                focusNode: _confirmPasswordFocus,
+                                label: 'Confirm Password',
+                                obscureText: _obscureConfirmPassword,
+                                prefixIcon: Icons.lock_outline_rounded,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscureConfirmPassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    color: Colors.white54,
+                                    size: 22,
+                                  ),
+                                  onPressed: () => setState(
+                                    () => _obscureConfirmPassword =
+                                        !_obscureConfirmPassword,
+                                  ),
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) {
+                                    return 'Please confirm your password';
+                                  }
+                                  if (v != _passwordController.text) {
+                                    return 'Passwords do not match';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
                             if (passwordStrength > 0) ...[
                               const SizedBox(height: 6),
                               Row(
@@ -406,44 +574,15 @@ class _RegisterPageState extends State<RegisterPage>
                                         value: passwordStrength / 4,
                                         backgroundColor: Colors.white24,
                                         valueColor: AlwaysStoppedAnimation<Color>(
-                                            _passwordStrengthColor(passwordStrength)),
+                                          _passwordStrengthColor(passwordStrength),
+                                        ),
                                         minHeight: 6,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
                             ],
-                            const SizedBox(height: _fieldSpacing),
-                            _GlowTextField(
-                              controller: _confirmPasswordController,
-                              focusNode: _confirmPasswordFocus,
-                              label: 'Confirm Password',
-                              obscureText: _obscureConfirmPassword,
-                              prefixIcon: Icons.lock_outline_rounded,
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscureConfirmPassword
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  color: Colors.white54,
-                                  size: 22,
-                                ),
-                                onPressed: () => setState(() =>
-                                    _obscureConfirmPassword =
-                                        !_obscureConfirmPassword),
-                              ),
-                              validator: (v) {
-                                if (v == null || v.isEmpty) {
-                                  return 'Please confirm your password';
-                                }
-                                if (v != _passwordController.text) {
-                                  return 'Passwords do not match';
-                                }
-                                return null;
-                              },
-                            ),
                             const SizedBox(height: _fieldSpacing),
                             Divider(
                               color: Colors.white.withValues(alpha: 0.25),
@@ -485,21 +624,13 @@ class _RegisterPageState extends State<RegisterPage>
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              'By signing up you agree to our privacy practices. We never share your data with third parties.',
-                              style: textTheme.bodySmall?.copyWith(
-                                color: Colors.white54,
-                                fontSize: 11,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
                             _SignUpButton(
                               isLoading: _isLoading,
                               isHovered: _buttonHovered,
                               onHover: (v) => setState(() => _buttonHovered = v),
                               onPressed: _isLoading ? null : _submit,
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 12),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -525,6 +656,7 @@ class _RegisterPageState extends State<RegisterPage>
                             ),
                           ],
                         ),
+                        ),
                       ),
                     ),
                   ),
@@ -538,38 +670,64 @@ class _RegisterPageState extends State<RegisterPage>
   }
 }
 
-class _AnimatedGradientBackground extends StatelessWidget {
-  const _AnimatedGradientBackground({required this.animation});
+class _AuthCardShell extends StatelessWidget {
+  const _AuthCardShell({required this.child});
 
-  final Animation<double> animation;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.background,
-                Color.lerp(
-                  const Color(0xFF020617),
-                  AppColors.accentIndigo.withValues(alpha: 0.08),
-                  animation.value * 0.5,
-                )!,
-                Color.lerp(
-                  const Color(0xFF0f172a),
-                  AppColors.accentPurple.withValues(alpha: 0.06),
-                  (1 - animation.value) * 0.5,
-                )!,
-              ],
-            ),
+    const radius = BorderRadius.all(Radius.circular(24));
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        border: Border.all(
+          color: AppColors.accentIndigo.withValues(alpha: 0.28),
+          width: 1.2,
+        ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.surface.withValues(alpha: 0.68),
+            AppColors.background.withValues(alpha: 0.62),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accentIndigo.withValues(alpha: 0.26),
+            blurRadius: 26,
+            spreadRadius: 1,
+            offset: const Offset(0, 10),
           ),
-        );
-      },
+          BoxShadow(
+            color: AppColors.accentPurple.withValues(alpha: 0.2),
+            blurRadius: 34,
+            spreadRadius: -2,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: 0.44,
+                  child: Image.asset(
+                    'assets/images/world_map_auth_bg.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  ),
+                ),
+              ),
+            ),
+            child,
+          ],
+        ),
+      ),
     );
   }
 }
@@ -789,17 +947,22 @@ class _SignUpButton extends StatelessWidget {
 }
 
 class _AvatarPreview extends StatelessWidget {
-  const _AvatarPreview({this.pickedImage});
+  const _AvatarPreview({this.pickedImage, this.radius = 44});
 
   final XFile? pickedImage;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
     if (pickedImage == null) {
       return CircleAvatar(
-        radius: 44,
+        radius: radius,
         backgroundColor: AppColors.surfaceSecondary.withValues(alpha: 0.8),
-        child: const Icon(Icons.person_rounded, size: 44, color: Colors.white54),
+        child: Icon(
+          Icons.person_rounded,
+          size: radius,
+          color: Colors.white54,
+        ),
       );
     }
     return FutureBuilder<dynamic>(
@@ -809,9 +972,13 @@ class _AvatarPreview extends StatelessWidget {
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return CircleAvatar(
-            radius: 44,
+            radius: radius,
             backgroundColor: AppColors.surfaceSecondary.withValues(alpha: 0.8),
-            child: const Icon(Icons.person_rounded, size: 44, color: Colors.white54),
+            child: Icon(
+              Icons.person_rounded,
+              size: radius,
+              color: Colors.white54,
+            ),
           );
         }
         final data = snapshot.data!;
@@ -822,7 +989,7 @@ class _AvatarPreview extends StatelessWidget {
           provider = MemoryImage(data is Uint8List ? data : Uint8List.fromList(data as List<int>));
         }
         return CircleAvatar(
-          radius: 44,
+          radius: radius,
           backgroundColor: AppColors.surfaceSecondary.withValues(alpha: 0.8),
           backgroundImage: provider,
           child: null,

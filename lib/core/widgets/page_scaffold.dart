@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:card_vault/core/theme/app_theme.dart';
+import 'package:card_vault/core/widgets/spline_background_stub.dart'
+    if (dart.library.html) 'package:card_vault/core/widgets/spline_background_web.dart';
 
 class GradientBackground extends StatelessWidget {
   const GradientBackground({super.key, required this.child});
@@ -9,18 +11,25 @@ class GradientBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.background,
-            Color(0xFF020617),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return Stack(
+      children: [
+        const Positioned.fill(child: SplineBackground()),
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.background.withValues(alpha: 0.84),
+                  const Color(0xFF020617).withValues(alpha: 0.88),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
         ),
-      ),
-      child: child,
+        child,
+      ],
     );
   }
 }

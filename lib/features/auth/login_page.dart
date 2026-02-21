@@ -28,8 +28,6 @@ class _LoginPageState extends State<LoginPage>
 
   late final AnimationController _fadeController;
   late final Animation<double> _fadeAnimation;
-  late final AnimationController _bgController;
-  late final Animation<double> _bgAnimation;
 
   @override
   void initState() {
@@ -42,14 +40,6 @@ class _LoginPageState extends State<LoginPage>
       parent: _fadeController,
       curve: Curves.easeOut,
     );
-    _bgController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 8),
-    )..repeat(reverse: true);
-    _bgAnimation = CurvedAnimation(
-      parent: _bgController,
-      curve: Curves.easeInOut,
-    );
     _fadeController.forward();
   }
 
@@ -60,7 +50,6 @@ class _LoginPageState extends State<LoginPage>
     _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
     _fadeController.dispose();
-    _bgController.dispose();
     super.dispose();
   }
 
@@ -103,37 +92,12 @@ class _LoginPageState extends State<LoginPage>
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 800;
-    final cardWidth = isWide ? 440.0 : double.infinity;
+    final cardWidth = isWide ? 460.0 : double.infinity;
     final textTheme = Theme.of(context).textTheme;
 
     return PageScaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          'CardVault',
-          style: textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.2,
-            color: Colors.white,
-            shadows: [
-              Shadow(
-                color: AppColors.accentIndigo.withValues(alpha: 0.6),
-                blurRadius: 12,
-                offset: const Offset(0, 0),
-              ),
-              Shadow(
-                color: AppColors.accentPurple.withValues(alpha: 0.4),
-                blurRadius: 24,
-                offset: const Offset(0, 0),
-              ),
-            ],
-          ),
-        ),
-      ),
       body: Stack(
         children: [
-          _AnimatedGradientBackground(animation: _bgAnimation),
           Center(
             child: FadeTransition(
               opacity: _fadeAnimation,
@@ -145,10 +109,11 @@ class _LoginPageState extends State<LoginPage>
                   ),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: cardWidth),
-                    child: GlassContainer(
-                      padding: const EdgeInsets.all(28),
-                      borderRadius: 20,
-                      child: Form(
+                    child: _AuthCardShell(
+                      child: GlassContainer(
+                        padding: const EdgeInsets.all(28),
+                        borderRadius: 20,
+                        child: Form(
                         key: _formKey,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -318,6 +283,7 @@ class _LoginPageState extends State<LoginPage>
                             ),
                           ],
                         ),
+                        ),
                       ),
                     ),
                   ),
@@ -331,38 +297,64 @@ class _LoginPageState extends State<LoginPage>
   }
 }
 
-class _AnimatedGradientBackground extends StatelessWidget {
-  const _AnimatedGradientBackground({required this.animation});
+class _AuthCardShell extends StatelessWidget {
+  const _AuthCardShell({required this.child});
 
-  final Animation<double> animation;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.background,
-                Color.lerp(
-                  const Color(0xFF020617),
-                  AppColors.accentIndigo.withValues(alpha: 0.08),
-                  animation.value * 0.5,
-                )!,
-                Color.lerp(
-                  const Color(0xFF0f172a),
-                  AppColors.accentPurple.withValues(alpha: 0.06),
-                  (1 - animation.value) * 0.5,
-                )!,
-              ],
-            ),
+    const radius = BorderRadius.all(Radius.circular(24));
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        border: Border.all(
+          color: AppColors.accentIndigo.withValues(alpha: 0.28),
+          width: 1.2,
+        ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.surface.withValues(alpha: 0.68),
+            AppColors.background.withValues(alpha: 0.62),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accentIndigo.withValues(alpha: 0.26),
+            blurRadius: 26,
+            spreadRadius: 1,
+            offset: const Offset(0, 10),
           ),
-        );
-      },
+          BoxShadow(
+            color: AppColors.accentPurple.withValues(alpha: 0.2),
+            blurRadius: 34,
+            spreadRadius: -2,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: 0.44,
+                  child: Image.asset(
+                    'assets/images/world_map_auth_bg.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  ),
+                ),
+              ),
+            ),
+            child,
+          ],
+        ),
+      ),
     );
   }
 }

@@ -286,24 +286,35 @@ class _AddCardPageState extends State<AddCardPage> {
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 900;
+    final pageTitle = _isEdit ? 'Edit card' : 'Add business card';
 
     return PageScaffold(
-      appBar: AppBar(
-        title: Text(_isEdit ? 'Edit card' : 'Add business card'),
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final showSideBySide = constraints.maxWidth > 900;
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
+            child: Text(
+              pageTitle,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final showSideBySide = constraints.maxWidth > 900;
 
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1100),
-                child: Flex(
-                  direction: showSideBySide ? Axis.horizontal : Axis.vertical,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1100),
+                      child: Flex(
+                        direction: showSideBySide ? Axis.horizontal : Axis.vertical,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                     Expanded(
                       flex: 3,
                       child: GlassContainer(
@@ -409,12 +420,15 @@ class _AddCardPageState extends State<AddCardPage> {
                         isWide: isWide,
                       ),
                     ),
-                  ],
-                ),
-              ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
