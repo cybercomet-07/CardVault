@@ -5,7 +5,8 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:card_vault/core/models/vault_card.dart';
 import 'package:card_vault/core/services/card_ocr_service_stub.dart'
-    if (dart.library.io) 'package:card_vault/core/services/card_ocr_service_io.dart' as card_ocr;
+    if (dart.library.io) 'package:card_vault/core/services/card_ocr_service_io.dart'
+    if (dart.library.html) 'package:card_vault/core/services/card_ocr_service_web.dart' as card_ocr;
 import 'package:card_vault/core/services/firestore_card_service.dart';
 import 'package:card_vault/core/services/storage_card_service.dart';
 import 'package:card_vault/core/theme/app_theme.dart';
@@ -37,6 +38,7 @@ class _CardsPageState extends State<CardsPage> {
   final _websiteController = TextEditingController();
   final _addressController = TextEditingController();
   final _notesController = TextEditingController();
+  String _selectedBusinessType = 'Other';
 
   String? _selectedCardId;
   Uint8List? _imageBytes;
@@ -91,6 +93,7 @@ class _CardsPageState extends State<CardsPage> {
     _websiteController.clear();
     _addressController.clear();
     _notesController.clear();
+    _selectedBusinessType = 'Other';
     _imageBytes = null;
     _existingImageURL = null;
     setState(() {});
@@ -106,6 +109,9 @@ class _CardsPageState extends State<CardsPage> {
     _websiteController.text = card.website ?? '';
     _addressController.text = card.address ?? '';
     _notesController.text = card.notes ?? '';
+    _selectedBusinessType = (card.businessType ?? '').trim().isNotEmpty
+        ? card.businessType!
+        : 'Other';
     _existingImageURL = card.imageURL;
     _imageBytes = null;
     setState(() {});
@@ -147,7 +153,11 @@ class _CardsPageState extends State<CardsPage> {
           if ((extracted.companyName ?? '').trim().isNotEmpty) _companyController.text = extracted.companyName!.trim();
           if ((extracted.phoneNumber ?? '').trim().isNotEmpty) _phoneController.text = extracted.phoneNumber!.trim();
           if ((extracted.email ?? '').trim().isNotEmpty) _emailController.text = extracted.email!.trim();
+          if ((extracted.website ?? '').trim().isNotEmpty) _websiteController.text = extracted.website!.trim();
           if ((extracted.address ?? '').trim().isNotEmpty) _addressController.text = extracted.address!.trim();
+          if ((extracted.businessType ?? '').trim().isNotEmpty) {
+            _selectedBusinessType = extracted.businessType!;
+          }
           setState(() {});
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -215,6 +225,7 @@ class _CardsPageState extends State<CardsPage> {
           userId: _userId,
           personName: person,
           companyName: company,
+          businessType: _selectedBusinessType,
           designation: designation.isEmpty ? null : designation,
           phoneNumber: phone,
           email: email.isEmpty ? null : email,
@@ -230,6 +241,7 @@ class _CardsPageState extends State<CardsPage> {
           userId: _userId,
           personName: person,
           companyName: company,
+          businessType: _selectedBusinessType,
           designation: designation.isEmpty ? null : designation,
           phoneNumber: phone,
           email: email.isEmpty ? null : email,
@@ -348,6 +360,7 @@ class _CardsPageState extends State<CardsPage> {
             ),
             const SizedBox(height: 8),
             _detailRow('Company', card.companyName),
+            _detailRow('Business type', card.businessType),
             _detailRow('Designation', card.designation),
             _detailRow('Phone', card.phoneNumber),
             _detailRow('Email', card.email),
@@ -509,6 +522,8 @@ class _CardsPageState extends State<CardsPage> {
                           const SizedBox(height: 12),
                           _field(_companyController, 'Company name *', validator: (v) => _validateRequired(v, 'Company name')),
                           const SizedBox(height: 12),
+                          _businessTypeDropdown(),
+                          const SizedBox(height: 12),
                           _field(_designationController, 'Designation (optional)'),
                           const SizedBox(height: 20),
                           _sectionLabel('Contact info'),
@@ -601,6 +616,43 @@ class _CardsPageState extends State<CardsPage> {
       keyboardType: keyboardType,
       validator: validator,
       onChanged: (_) => setState(() {}),
+    );
+  }
+
+  Widget _businessTypeDropdown() {
+    const options = [
+      'Technology',
+      'Healthcare',
+      'Finance',
+      'Marketing',
+      'Retail',
+      'Education',
+      'Hospitality',
+      'Manufacturing',
+      'Consulting',
+      'Other',
+    ];
+    return DropdownButtonFormField<String>(
+      initialValue: options.contains(_selectedBusinessType) ? _selectedBusinessType : 'Other',
+      decoration: InputDecoration(
+        labelText: 'Business type',
+        filled: true,
+        fillColor: AppColors.surfaceSecondary.withValues(alpha: 0.6),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      items: options
+          .map((t) => DropdownMenuItem<String>(
+                value: t,
+                child: Text(t),
+              ))
+          .toList(),
+      onChanged: (value) {
+        if (value == null) return;
+        setState(() => _selectedBusinessType = value);
+      },
     );
   }
 }

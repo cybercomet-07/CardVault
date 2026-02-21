@@ -5,12 +5,16 @@ class ExtractedCardData {
     this.companyName,
     this.phoneNumber,
     this.email,
+    this.website,
     this.address,
+    this.businessType,
   });
 
   final String? personName;
   final String? companyName;
   final String? phoneNumber;
   final String? email;
+  final String? website;
   final String? address;
+  final String? businessType;
 }

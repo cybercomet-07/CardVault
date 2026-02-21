@@ -52,6 +52,7 @@ class _CardDetailsBody extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final personName = card.personName?.trim().isNotEmpty == true ? card.personName! : '—';
     final companyName = card.companyName?.trim().isNotEmpty == true ? card.companyName! : '—';
+    final businessType = card.businessType?.trim().isNotEmpty == true ? card.businessType! : '—';
     final designation = card.designation?.trim().isNotEmpty == true ? card.designation! : '—';
     final phone = card.phoneNumber?.trim().isNotEmpty == true ? card.phoneNumber! : '—';
     final email = card.email?.trim().isNotEmpty == true ? card.email! : '—';
@@ -96,6 +97,7 @@ class _CardDetailsBody extends StatelessWidget {
                           const SizedBox(height: 16),
                         _DetailRow(label: 'Person name', value: personName),
                         _DetailRow(label: 'Company', value: companyName),
+                        _DetailRow(label: 'Business type', value: businessType),
                         _DetailRow(label: 'Designation', value: designation),
                         _DetailRow(label: 'Phone', value: phone),
                         _DetailRow(label: 'Email', value: email),

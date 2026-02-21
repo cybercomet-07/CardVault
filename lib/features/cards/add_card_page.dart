@@ -5,7 +5,8 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:card_vault/core/models/vault_card.dart';
 import 'package:card_vault/core/services/card_ocr_service_stub.dart'
-    if (dart.library.io) 'package:card_vault/core/services/card_ocr_service_io.dart' as card_ocr;
+    if (dart.library.io) 'package:card_vault/core/services/card_ocr_service_io.dart'
+    if (dart.library.html) 'package:card_vault/core/services/card_ocr_service_web.dart' as card_ocr;
 import 'package:card_vault/core/services/firestore_card_service.dart';
 import 'package:card_vault/core/services/storage_card_service.dart';
 import 'package:card_vault/core/theme/app_theme.dart';
@@ -33,6 +34,7 @@ class _AddCardPageState extends State<AddCardPage> {
   final _websiteController = TextEditingController();
   final _addressController = TextEditingController();
   final _notesController = TextEditingController();
+  String _selectedBusinessType = 'Other';
 
   final _firestoreCardService = FirestoreCardService();
   final _storageCardService = StorageCardService();
@@ -73,6 +75,9 @@ class _AddCardPageState extends State<AddCardPage> {
       _websiteController.text = card.website ?? '';
       _addressController.text = card.address ?? '';
       _notesController.text = card.notes ?? '';
+      _selectedBusinessType = (card.businessType ?? '').trim().isNotEmpty
+          ? card.businessType!
+          : 'Other';
       _existingImageURL = card.imageURL;
       setState(() {});
     }
@@ -135,7 +140,11 @@ class _AddCardPageState extends State<AddCardPage> {
           if ((extracted.companyName ?? '').trim().isNotEmpty) _companyController.text = extracted.companyName!.trim();
           if ((extracted.phoneNumber ?? '').trim().isNotEmpty) _phoneController.text = extracted.phoneNumber!.trim();
           if ((extracted.email ?? '').trim().isNotEmpty) _emailController.text = extracted.email!.trim();
+          if ((extracted.website ?? '').trim().isNotEmpty) _websiteController.text = extracted.website!.trim();
           if ((extracted.address ?? '').trim().isNotEmpty) _addressController.text = extracted.address!.trim();
+          if ((extracted.businessType ?? '').trim().isNotEmpty) {
+            _selectedBusinessType = extracted.businessType!;
+          }
           setState(() {});
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -190,6 +199,7 @@ class _AddCardPageState extends State<AddCardPage> {
           userId: _userId,
           companyName: company.isEmpty ? null : company,
           personName: person.isEmpty ? null : person,
+          businessType: _selectedBusinessType,
           designation: designation.isEmpty ? null : designation,
           phoneNumber: phone.isEmpty ? null : phone,
           email: email.isEmpty ? null : email,
@@ -221,6 +231,7 @@ class _AddCardPageState extends State<AddCardPage> {
           userId: _userId,
           companyName: company.isEmpty ? null : company,
           personName: person.isEmpty ? null : person,
+          businessType: _selectedBusinessType,
           designation: designation.isEmpty ? null : designation,
           phoneNumber: phone.isEmpty ? null : phone,
           email: email.isEmpty ? null : email,
@@ -320,6 +331,8 @@ class _AddCardPageState extends State<AddCardPage> {
                                   hint: 'Full name',
                                   validator: _validateCompanyOrPerson,
                                 ),
+                                const SizedBox(height: 14),
+                                _businessTypeDropdown(),
                                 const SizedBox(height: 14),
                                 _buildField(
                                   controller: _designationController,
@@ -439,6 +452,43 @@ class _AddCardPageState extends State<AddCardPage> {
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
           ),
+    );
+  }
+
+  Widget _businessTypeDropdown() {
+    const options = [
+      'Technology',
+      'Healthcare',
+      'Finance',
+      'Marketing',
+      'Retail',
+      'Education',
+      'Hospitality',
+      'Manufacturing',
+      'Consulting',
+      'Other',
+    ];
+    return DropdownButtonFormField<String>(
+      initialValue: options.contains(_selectedBusinessType) ? _selectedBusinessType : 'Other',
+      decoration: InputDecoration(
+        labelText: 'Business type',
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+        filled: true,
+        fillColor: AppColors.surfaceSecondary.withValues(alpha: 0.6),
+      ),
+      items: options
+          .map((t) => DropdownMenuItem<String>(
+                value: t,
+                child: Text(t),
+              ))
+          .toList(),
+      onChanged: (value) {
+        if (value == null) return;
+        setState(() => _selectedBusinessType = value);
+      },
     );
   }
 

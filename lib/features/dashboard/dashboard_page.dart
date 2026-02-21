@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import 'package:card_vault/core/models/vault_card.dart';
@@ -6,7 +7,8 @@ import 'package:card_vault/core/router/app_router.dart';
 import 'package:card_vault/core/services/firestore_card_service.dart';
 import 'package:card_vault/core/services/storage_card_service.dart';
 import 'package:card_vault/core/services/card_ocr_service_stub.dart'
-    if (dart.library.io) 'package:card_vault/core/services/card_ocr_service_io.dart' as card_ocr;
+    if (dart.library.io) 'package:card_vault/core/services/card_ocr_service_io.dart'
+    if (dart.library.html) 'package:card_vault/core/services/card_ocr_service_web.dart' as card_ocr;
 import 'package:card_vault/core/theme/app_theme.dart';
 import 'package:card_vault/core/widgets/capture_card_modal.dart';
 import 'package:card_vault/core/widgets/glass_container.dart';
@@ -145,21 +147,10 @@ class _DashboardPageState extends State<DashboardPage> {
                                               ],
                                             ),
                                             const SizedBox(height: 20),
-                                            Text(
-                                              'Add new card',
-                                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                                color: Colors.white70,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 10),
-                                            _AnimatedAddCardButton(
-                                              onPressed: () {
-                                                Navigator.pushNamed(
-                                                  context,
-                                                  AppRouter.cards,
-                                                );
-                                              },
+                                            _BusinessTypeChart(
+                                              cards: cards,
+                                              cameraLoading: _cameraLoading,
+                                              onCapture: _captureAndSaveCard,
                                             ),
                                           ],
                                         ),
@@ -177,14 +168,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
             ],
-          ),
-          Positioned(
-            right: 24,
-            bottom: 24,
-            child: _CameraFAB(
-              isLoading: _cameraLoading,
-              onPressed: _captureAndSaveCard,
-            ),
           ),
         ],
       ),
@@ -241,6 +224,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         final c = cards[index];
                         final person = c.personName?.trim().isNotEmpty == true ? c.personName! : '—';
                         final company = c.companyName?.trim().isNotEmpty == true ? c.companyName! : '—';
+                        final businessType = c.businessType?.trim().isNotEmpty == true ? c.businessType! : '—';
                         final phone = c.phoneNumber?.trim().isNotEmpty == true ? c.phoneNumber! : '—';
                         final address = c.address?.trim().isNotEmpty == true ? c.address! : '—';
                         return Card(
@@ -257,6 +241,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 children: [
                                   Text('Person: $person', style: Theme.of(context).textTheme.bodySmall),
                                   Text('Company: $company', style: Theme.of(context).textTheme.bodySmall),
+                                  Text('Business type: $businessType', style: Theme.of(context).textTheme.bodySmall),
                                   Text('Phone: $phone', style: Theme.of(context).textTheme.bodySmall),
                                   Text('Address: $address', style: Theme.of(context).textTheme.bodySmall),
                                 ],
@@ -406,6 +391,7 @@ class _DashboardPageState extends State<DashboardPage> {
     if (bytes == null || !mounted) return;
 
     setState(() => _cameraLoading = true);
+    String? docId;
     try {
       // Extract text from card image (OCR on mobile; null on web)
       final extracted = await card_ocr.extractCardTextFromImage(bytes);
@@ -415,47 +401,64 @@ class _DashboardPageState extends State<DashboardPage> {
         userId: user.uid,
         companyName: extracted?.companyName ?? '',
         personName: extracted?.personName ?? '',
+        businessType: extracted?.businessType ?? 'Other',
         designation: '',
         phoneNumber: extracted?.phoneNumber ?? '',
         email: extracted?.email ?? '',
-        website: '',
+        website: extracted?.website ?? '',
         address: extracted?.address ?? '',
         notes: '',
         imageURL: '',
       );
-      final docId = await _firestoreCardService.addCard(card);
+      docId = await _firestoreCardService.addCard(card);
+      final cardWithId = card.copyWith(id: docId);
 
-      final url = await _storageCardService.uploadCardImage(
-        userId: user.uid,
-        cardId: docId,
-        bytes: bytes,
-      );
-
-      await _firestoreCardService.updateCard(
-        card.copyWith(id: docId, imageURL: url),
-      );
+      // Upload image with timeout so we never hang (e.g. web Storage CORS)
+      String? url;
+      try {
+        url = await _storageCardService
+            .uploadCardImage(userId: user.uid, cardId: docId, bytes: bytes)
+            .timeout(const Duration(seconds: 25));
+        await _firestoreCardService.updateCard(
+          cardWithId.copyWith(imageURL: url),
+        );
+      } catch (_) {
+        // Card already saved; image upload failed or timed out
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Card saved. Image upload failed — add details and image on the Cards page.',
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
 
       if (mounted) {
-        setState(() => _cameraLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              extracted != null
-                  ? 'Card saved with extracted details. View in Active cards or Cards page.'
-                  : 'Card image saved. Add details on the Cards page.',
+        if (url != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                extracted != null
+                    ? 'Card saved with extracted details. View in Active cards or Cards page.'
+                    : 'Card saved. Add name, company, etc. on the Cards page.',
+              ),
+              behavior: SnackBarBehavior.floating,
             ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        Navigator.pushNamed(context, AppRouter.cards);
+          );
+        }
+        Navigator.pushNamed(context, AppRouter.cards, arguments: docId);
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _cameraLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save: $e'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text('Failed to save card: $e'), behavior: SnackBarBehavior.floating),
         );
       }
+    } finally {
+      if (mounted) setState(() => _cameraLoading = false);
     }
   }
 }
@@ -873,30 +876,45 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _AnimatedAddCardButton extends StatefulWidget {
-  const _AnimatedAddCardButton({required this.onPressed});
+/// Standard business types for cards.
+const List<String> _businessTypes = [
+  'Technology',
+  'Healthcare',
+  'Finance',
+  'Marketing',
+  'Retail',
+  'Education',
+  'Other',
+];
 
-  final VoidCallback onPressed;
+class _BusinessTypeChart extends StatefulWidget {
+  const _BusinessTypeChart({
+    required this.cards,
+    required this.cameraLoading,
+    required this.onCapture,
+  });
+
+  final List<VaultCard> cards;
+  final bool cameraLoading;
+  final VoidCallback onCapture;
 
   @override
-  State<_AnimatedAddCardButton> createState() => _AnimatedAddCardButtonState();
+  State<_BusinessTypeChart> createState() => _BusinessTypeChartState();
 }
 
-class _AnimatedAddCardButtonState extends State<_AnimatedAddCardButton>
+class _BusinessTypeChartState extends State<_BusinessTypeChart>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _scale;
+  late AnimationController _controller;
+  late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-    _scale = Tween<double>(begin: 0.98, end: 1.02).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+      duration: const Duration(milliseconds: 1200),
+    )..forward();
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
   }
 
   @override
@@ -907,13 +925,196 @@ class _AnimatedAddCardButtonState extends State<_AnimatedAddCardButton>
 
   @override
   Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scale,
-      child: PrimaryButton(
-        label: 'Add new card',
-        icon: Icons.add_rounded,
-        onPressed: widget.onPressed,
-      ),
+    final counts = <String, int>{};
+    for (final t in _businessTypes) {
+      counts[t] = 0;
+    }
+    for (final c in widget.cards) {
+      final t = (c.businessType ?? '').trim();
+      final key = t.isEmpty ? 'Other' : (_businessTypes.contains(t) ? t : 'Other');
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    final total = widget.cards.length;
+    final colorByType = <String, Color>{
+      'Technology': AppColors.accentIndigo,
+      'Healthcare': Colors.tealAccent,
+      'Finance': Colors.amberAccent,
+      'Marketing': Colors.pinkAccent,
+      'Retail': Colors.cyanAccent,
+      'Education': Colors.lightGreenAccent,
+      'Other': AppColors.accentPurple,
+    };
+
+    if (total == 0) {
+      return Expanded(
+        child: Center(
+          child: Text(
+            'Add cards to see business type breakdown',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white54,
+                ),
+          ),
+        ),
+      );
+    }
+    final sections = <PieChartSectionData>[];
+    for (final t in _businessTypes) {
+      final n = counts[t] ?? 0;
+      if (n > 0) {
+        sections.add(
+          PieChartSectionData(
+            value: n.toDouble(),
+            title: '$n',
+            color: colorByType[t] ?? Colors.white70,
+            radius: 36,
+            titleStyle: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        );
+      }
+    }
+    if (sections.isEmpty) {
+      return Expanded(
+        child: Center(
+          child: Text(
+            'Add cards with business type to see chart',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white54,
+                ),
+          ),
+        ),
+      );
+    }
+
+    final topType = counts.entries
+        .where((e) => e.value > 0)
+        .fold<MapEntry<String, int>?>(null, (best, cur) {
+      if (best == null) return cur;
+      return cur.value > best.value ? cur : best;
+    });
+    final usedTypes = counts.entries.where((e) => e.value > 0).length;
+
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Expanded(
+          child: Column(
+            children: [
+              SizedBox(
+                height: 150,
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: PieChart(
+                        PieChartData(
+                          sectionsSpace: 2,
+                          centerSpaceRadius: 28,
+                          sections: sections
+                              .map((s) => PieChartSectionData(
+                                    value: s.value,
+                                    title: s.title,
+                                    color: s.color,
+                                    radius: s.radius * _animation.value,
+                                    titleStyle: s.titleStyle,
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: _businessTypes
+                            .where((t) => (counts[t] ?? 0) > 0)
+                            .map((t) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          color: colorByType[t] ?? Colors.white70,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          t,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(color: Colors.white70),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ))
+                            .toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceSecondary.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Insights',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Top type: ${topType?.key ?? '—'} (${topType?.value ?? 0})',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Types used: $usedTypes / ${_businessTypes.length}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Total cards: $total',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                      ),
+                      const Spacer(),
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: _CameraFAB(
+                          isLoading: widget.cameraLoading,
+                          onPressed: widget.onCapture,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

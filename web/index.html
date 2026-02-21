@@ -8,6 +8,87 @@
   <link rel="stylesheet" href="flutter_bootstrap.css" />
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+  <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
+  <script>
+    async function _enhanceImage(dataUrl) {
+      const img = new Image();
+      img.src = dataUrl;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+
+      const scale = 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Contrast + grayscale boost for OCR on photographed cards.
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+        const boosted = Math.max(0, Math.min(255, (gray - 128) * 1.45 + 128));
+        data[i] = boosted;
+        data[i + 1] = boosted;
+        data[i + 2] = boosted;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      return canvas.toDataURL('image/jpeg', 0.95);
+    }
+
+    function _scoreOcrText(text) {
+      if (!text) return 0;
+      const t = text.trim();
+      if (!t) return 0;
+      let score = 0;
+      if (/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(t)) score += 45;
+      if (/(\+?\d[\d\-\s().]{7,}\d)/.test(t)) score += 25;
+      if (/(https?:\/\/|www\.)[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(t)) score += 20;
+      const words = t.match(/[A-Za-z]{3,}/g) || [];
+      score += Math.min(45, words.length * 2);
+      const noisy = t.match(/[^A-Za-z0-9\s@+.,:\/()\-]/g) || [];
+      score -= noisy.length * 2;
+      return score;
+    }
+
+    async function _runRecognize(worker, source, psm) {
+      await worker.setParameters({
+        tessedit_pageseg_mode: String(psm),
+        preserve_interword_spaces: '1',
+      });
+      const { data: { text } } = await worker.recognize(source);
+      return text || '';
+    }
+
+    window.cardVaultOcr = async function(dataUrl) {
+      const enhancedDataUrl = await _enhanceImage(dataUrl);
+      const worker = await Tesseract.createWorker();
+      await worker.load();
+      await worker.loadLanguage('eng');
+      await worker.initialize('eng');
+
+      const raw6 = await _runRecognize(worker, dataUrl, 6);
+      const enhanced6 = await _runRecognize(worker, enhancedDataUrl, 6);
+      const enhanced11 = await _runRecognize(worker, enhancedDataUrl, 11);
+
+      await worker.terminate();
+
+      const candidates = [raw6, enhanced6, enhanced11];
+      let best = '';
+      let bestScore = -99999;
+      for (const c of candidates) {
+        const s = _scoreOcrText(c);
+        if (s > bestScore) {
+          bestScore = s;
+          best = c;
+        }
+      }
+      return best || '';
+    };
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </head>
 <body>

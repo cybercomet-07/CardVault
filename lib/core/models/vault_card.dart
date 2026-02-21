@@ -14,6 +14,7 @@ class VaultCard {
     this.address,
     this.notes,
     this.imageURL,
+    this.businessType,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -28,6 +29,7 @@ class VaultCard {
   final String? address;
   final String? notes;
   final String? imageURL;
+  final String? businessType;
   final DateTime createdAt;
 
   Map<String, dynamic> toMap() {
@@ -42,6 +44,7 @@ class VaultCard {
       'address': address ?? '',
       'notes': notes ?? '',
       'imageUrl': imageURL ?? '',
+      'businessType': businessType ?? '',
       'createdAt': createdAt.millisecondsSinceEpoch,
     };
   }
@@ -60,6 +63,7 @@ class VaultCard {
       address: map['address'] as String?,
       notes: map['notes'] as String?,
       imageURL: imageUrl,
+      businessType: map['businessType'] as String?,
       createdAt: map['createdAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(
               (map['createdAt'] as num).toInt())
@@ -79,6 +83,7 @@ class VaultCard {
     String? address,
     String? notes,
     String? imageURL,
+    String? businessType,
     DateTime? createdAt,
   }) {
     return VaultCard(
@@ -93,6 +98,7 @@ class VaultCard {
       address: address ?? this.address,
       notes: notes ?? this.notes,
       imageURL: imageURL ?? this.imageURL,
+      businessType: businessType ?? this.businessType,
       createdAt: createdAt ?? this.createdAt,
     );
   }
