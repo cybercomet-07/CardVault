@@ -422,185 +422,217 @@ class _CardsPageState extends State<CardsPage> {
   @override
   Widget build(BuildContext context) {
     return PageScaffold(
-      body: Padding(
-        padding: const EdgeInsets.only(top: 14),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 14),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final split = constraints.maxWidth >= 900;
+              if (split) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Cards',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Expanded(child: _buildRecentCardsPanel()),
+                          Expanded(child: _buildCardFormPanel()),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Cards',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 360,
+                      child: _buildRecentCardsPanel(),
+                    ),
+                    _buildCardFormPanel(),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentCardsPanel() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: GlassContainer(
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Cards',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
+            Text(
+              'Recent cards',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
             Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final split = constraints.maxWidth >= 900;
-                  return Flex(
-                    direction: split ? Axis.horizontal : Axis.vertical,
-                    children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: GlassContainer(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Recent cards',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 16),
-                        Expanded(
-                          child: StreamBuilder<List<VaultCard>>(
-                            stream: _firestoreCardService.streamCards(_userId),
-                            builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                              return _ShimmerCardList();
-                            }
-                            final cards = snapshot.data ?? [];
-                            if (cards.isEmpty) {
-                              return Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.credit_card_off_rounded, size: 64, color: Colors.white24),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'No cards yet',
-                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Colors.white54),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Add your first card using the form on the right.',
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white38),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-                            return ListView.builder(
-                              controller: _listScrollController,
-                              itemCount: cards.length,
-                              itemBuilder: (context, index) {
-                                final card = cards[index];
-                                final isSelected = _selectedCardId == card.id;
-                                return _CardListTile(
-                                  card: card,
-                                  isSelected: isSelected,
-                                  onTap: () {
-                                    if (card.imageURL != null && card.imageURL!.isNotEmpty) {
-                                      _showImageModal(card.imageURL!);
-                                    } else {
-                                      _showDetailsPanel(card);
-                                    }
-                                  },
-                                  onEdit: () => _loadCardIntoForm(card),
-                                  onDelete: () => _deleteCard(card.id),
-                                );
-                              },
-                            );
-                            },
+              child: StreamBuilder<List<VaultCard>>(
+                stream: _firestoreCardService.streamCards(_userId),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                    return _ShimmerCardList();
+                  }
+                  final cards = snapshot.data ?? [];
+                  if (cards.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.credit_card_off_rounded, size: 64, color: Colors.white24),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No cards yet',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Colors.white54),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: GlassContainer(
-                    padding: const EdgeInsets.all(24),
-                    child: Form(
-                      key: _formKey,
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _selectedCardId != null ? 'Edit card' : 'Add new card',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          const SizedBox(height: 20),
-                          _sectionLabel('Basic info'),
-                          const SizedBox(height: 10),
-                          _field(_personController, 'Person name *', validator: (v) => _validateRequired(v, 'Person name')),
-                          const SizedBox(height: 12),
-                          _field(_companyController, 'Company name *', validator: (v) => _validateRequired(v, 'Company name')),
-                          const SizedBox(height: 12),
-                          _businessTypeDropdown(),
-                          const SizedBox(height: 12),
-                          _field(_designationController, 'Designation (optional)'),
-                          const SizedBox(height: 20),
-                          _sectionLabel('Contact info'),
-                          const SizedBox(height: 10),
-                          _field(_phoneController, 'Phone number *', keyboardType: TextInputType.phone, validator: (v) => _validateRequired(v, 'Phone number')),
-                          const SizedBox(height: 12),
-                          _field(_emailController, 'Email (optional)', keyboardType: TextInputType.emailAddress, validator: _validateEmail),
-                          const SizedBox(height: 12),
-                          _field(_websiteController, 'Website (optional)', keyboardType: TextInputType.url, validator: _validateWebsite),
-                          const SizedBox(height: 12),
-                          _field(_addressController, 'Office address (optional)', maxLines: 2),
-                          const SizedBox(height: 20),
-                          _sectionLabel('Additional'),
-                          const SizedBox(height: 10),
-                          _field(_notesController, 'Notes (optional)', maxLines: 2),
-                          const SizedBox(height: 20),
-                          _sectionLabel('Image (optional)'),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              _ImageButton(icon: Icons.upload_file_rounded, label: 'Upload', onTap: () => _pickImage(ImageSource.gallery)),
-                              const SizedBox(width: 12),
-                              _ImageButton(icon: Icons.camera_alt_rounded, label: 'Capture', onTap: () => _pickImage(ImageSource.camera)),
-                            ],
+                          const SizedBox(height: 8),
+                          Text(
+                            'Add your first card using the form below.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white38),
+                            textAlign: TextAlign.center,
                           ),
-                          if (_imageBytes != null || (_existingImageURL != null && _existingImageURL!.isNotEmpty)) ...[
-                            const SizedBox(height: 12),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: _imageBytes != null
-                                  ? Image.memory(_imageBytes!, height: 120, width: double.infinity, fit: BoxFit.cover)
-                                  : Image.network(
-                                      _existingImageURL!,
-                                      height: 120,
-                                      width: double.infinity,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                                    ),
-                            ),
-                          ],
-                          const SizedBox(height: 28),
-                          SizedBox(
-                            width: double.infinity,
-                            child: PrimaryButton(
-                              label: _isSaving ? 'Saving...' : (_selectedCardId != null ? 'Update card' : 'Save card'),
-                              icon: _isSaving ? null : Icons.check_rounded,
-                              onPressed: _isSaving ? null : _save,
-                            ),
-                          ),
-                          ],
-                        ),
+                        ],
                       ),
-                    ),
-                  ),
-                ),
-              ),
-                    ],
+                    );
+                  }
+                  return ListView.builder(
+                    controller: _listScrollController,
+                    itemCount: cards.length,
+                    itemBuilder: (context, index) {
+                      final card = cards[index];
+                      final isSelected = _selectedCardId == card.id;
+                      return _CardListTile(
+                        card: card,
+                        isSelected: isSelected,
+                        onTap: () {
+                          if (card.imageURL != null && card.imageURL!.isNotEmpty) {
+                            _showImageModal(card.imageURL!);
+                          } else {
+                            _showDetailsPanel(card);
+                          }
+                        },
+                        onEdit: () => _loadCardIntoForm(card),
+                        onDelete: () => _deleteCard(card.id),
+                      );
+                    },
                   );
                 },
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardFormPanel() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: GlassContainer(
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _selectedCardId != null ? 'Edit card' : 'Add new card',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 20),
+                _sectionLabel('Basic info'),
+                const SizedBox(height: 10),
+                _field(_personController, 'Person name *', validator: (v) => _validateRequired(v, 'Person name')),
+                const SizedBox(height: 12),
+                _field(_companyController, 'Company name *', validator: (v) => _validateRequired(v, 'Company name')),
+                const SizedBox(height: 12),
+                _businessTypeDropdown(),
+                const SizedBox(height: 12),
+                _field(_designationController, 'Designation (optional)'),
+                const SizedBox(height: 20),
+                _sectionLabel('Contact info'),
+                const SizedBox(height: 10),
+                _field(_phoneController, 'Phone number *', keyboardType: TextInputType.phone, validator: (v) => _validateRequired(v, 'Phone number')),
+                const SizedBox(height: 12),
+                _field(_emailController, 'Email (optional)', keyboardType: TextInputType.emailAddress, validator: _validateEmail),
+                const SizedBox(height: 12),
+                _field(_websiteController, 'Website (optional)', keyboardType: TextInputType.url, validator: _validateWebsite),
+                const SizedBox(height: 12),
+                _field(_addressController, 'Office address (optional)', maxLines: 2),
+                const SizedBox(height: 20),
+                _sectionLabel('Additional'),
+                const SizedBox(height: 10),
+                _field(_notesController, 'Notes (optional)', maxLines: 2),
+                const SizedBox(height: 20),
+                _sectionLabel('Image (optional)'),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 10,
+                  children: [
+                    _ImageButton(icon: Icons.upload_file_rounded, label: 'Upload', onTap: () => _pickImage(ImageSource.gallery)),
+                    _ImageButton(icon: Icons.camera_alt_rounded, label: 'Capture', onTap: () => _pickImage(ImageSource.camera)),
+                  ],
+                ),
+                if (_imageBytes != null || (_existingImageURL != null && _existingImageURL!.isNotEmpty)) ...[
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: _imageBytes != null
+                        ? Image.memory(_imageBytes!, height: 120, width: double.infinity, fit: BoxFit.cover)
+                        : Image.network(
+                            _existingImageURL!,
+                            height: 120,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                          ),
+                  ),
+                ],
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: PrimaryButton(
+                    label: _isSaving ? 'Saving...' : (_selectedCardId != null ? 'Update card' : 'Save card'),
+                    icon: _isSaving ? null : Icons.check_rounded,
+                    onPressed: _isSaving ? null : _save,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

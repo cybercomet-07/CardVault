@@ -62,101 +62,88 @@ class _DashboardPageState extends State<DashboardPage> {
                             return LayoutBuilder(
                               builder: (context, constraints) {
                                 final isTwoColumn = constraints.maxWidth > 900;
-                                return Flex(
-                                  direction: isTwoColumn ? Axis.horizontal : Axis.vertical,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      flex: 2,
-                                      child: GlassContainer(
-                                        padding: const EdgeInsets.all(24),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'Your cards',
-                                              style: Theme.of(context).textTheme.titleMedium,
-                                            ),
-                                            const SizedBox(height: 16),
-                                            Expanded(
-                                              child: hasCards
-                                                  ? ListView.separated(
-                                                      itemCount: cards.length,
-                                                      separatorBuilder: (_, __) =>
-                                                          const SizedBox(height: 12),
-                                                      itemBuilder: (context, index) {
-                                                        return _CardTile(
-                                                          card: cards[index],
-                                                          onView: () {
-                                                            Navigator.pushNamed(
-                                                              context,
-                                                              AppRouter.cardDetails,
-                                                              arguments: cards[index].id,
-                                                            );
-                                                          },
-                                                          onEdit: () {
-                                                            Navigator.pushNamed(
-                                                              context,
-                                                              AppRouter.cards,
-                                                              arguments: cards[index].id,
-                                                            );
-                                                          },
-                                                          onDelete: () => _deleteCard(cards[index].id),
-                                                        );
-                                                      },
-                                                    )
-                                                  : _EmptyCardsState(
-                                                      onAddCard: () {
-                                                        Navigator.pushNamed(
-                                                          context,
-                                                          AppRouter.cards,
-                                                        );
-                                                      },
-                                                    ),
-                                            ),
-                                          ],
+                                if (isTwoColumn) {
+                                  return Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        flex: 2,
+                                        child: _CardsPanel(
+                                          cards: cards,
+                                          hasCards: hasCards,
+                                          onAddCard: () {
+                                            Navigator.pushNamed(context, AppRouter.cards);
+                                          },
+                                          onViewCard: (id) {
+                                            Navigator.pushNamed(
+                                              context,
+                                              AppRouter.cardDetails,
+                                              arguments: id,
+                                            );
+                                          },
+                                          onEditCard: (id) {
+                                            Navigator.pushNamed(
+                                              context,
+                                              AppRouter.cards,
+                                              arguments: id,
+                                            );
+                                          },
+                                          onDeleteCard: _deleteCard,
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 16, width: 16),
-                                    Expanded(
-                                      flex: 1,
-                                      child: GlassContainer(
-                                        padding: const EdgeInsets.all(24),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'Overview',
-                                              style: Theme.of(context).textTheme.titleMedium,
-                                            ),
-                                            const SizedBox(height: 16),
-                                            Row(
-                                              children: [
-                                                _StatCard(
-                                                  label: 'Active cards',
-                                                  value: '${cards.length}',
-                                                  onTap: () => _showActiveCardsSheet(context, cards),
-                                                ),
-                                                const SizedBox(width: 12),
-                                                _StatCard(
-                                                  label: 'Vaults',
-                                                  value: '1',
-                                                  onTap: () => _showVaultGallerySheet(context, cards),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 20),
-                                            _BusinessTypeChart(
-                                              cards: cards,
-                                              cameraLoading: _cameraLoading,
-                                              onCapture: _captureAndSaveCard,
-                                            ),
-                                          ],
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        flex: 1,
+                                        child: _OverviewPanel(
+                                          cards: cards,
+                                          cameraLoading: _cameraLoading,
+                                          onCapture: _captureAndSaveCard,
+                                          onOpenActive: () => _showActiveCardsSheet(context, cards),
+                                          onOpenVault: () => _showVaultGallerySheet(context, cards),
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  );
+                                }
+
+                                return SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      _CardsPanel(
+                                        cards: cards,
+                                        hasCards: hasCards,
+                                        maxHeight: 420,
+                                        onAddCard: () {
+                                          Navigator.pushNamed(context, AppRouter.cards);
+                                        },
+                                        onViewCard: (id) {
+                                          Navigator.pushNamed(
+                                            context,
+                                            AppRouter.cardDetails,
+                                            arguments: id,
+                                          );
+                                        },
+                                        onEditCard: (id) {
+                                          Navigator.pushNamed(
+                                            context,
+                                            AppRouter.cards,
+                                            arguments: id,
+                                          );
+                                        },
+                                        onDeleteCard: _deleteCard,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _OverviewPanel(
+                                        cards: cards,
+                                        cameraLoading: _cameraLoading,
+                                        onCapture: _captureAndSaveCard,
+                                        onOpenActive: () => _showActiveCardsSheet(context, cards),
+                                        onOpenVault: () => _showVaultGallerySheet(context, cards),
+                                      ),
+                                      const SizedBox(height: 16),
+                                    ],
+                                  ),
                                 );
                               },
                             );
@@ -460,6 +447,119 @@ class _DashboardPageState extends State<DashboardPage> {
     } finally {
       if (mounted) setState(() => _cameraLoading = false);
     }
+  }
+}
+
+class _CardsPanel extends StatelessWidget {
+  const _CardsPanel({
+    required this.cards,
+    required this.hasCards,
+    required this.onAddCard,
+    required this.onViewCard,
+    required this.onEditCard,
+    required this.onDeleteCard,
+    this.maxHeight,
+  });
+
+  final List<VaultCard> cards;
+  final bool hasCards;
+  final VoidCallback onAddCard;
+  final void Function(String id) onViewCard;
+  final void Function(String id) onEditCard;
+  final void Function(String id) onDeleteCard;
+  final double? maxHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = GlassContainer(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Your cards',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: hasCards
+                ? ListView.separated(
+                    itemCount: cards.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final card = cards[index];
+                      return _CardTile(
+                        card: card,
+                        onView: () => onViewCard(card.id),
+                        onEdit: () => onEditCard(card.id),
+                        onDelete: () => onDeleteCard(card.id),
+                      );
+                    },
+                  )
+                : _EmptyCardsState(onAddCard: onAddCard),
+          ),
+        ],
+      ),
+    );
+    if (maxHeight == null) return content;
+    return SizedBox(height: maxHeight, child: content);
+  }
+}
+
+class _OverviewPanel extends StatelessWidget {
+  const _OverviewPanel({
+    required this.cards,
+    required this.cameraLoading,
+    required this.onCapture,
+    required this.onOpenActive,
+    required this.onOpenVault,
+  });
+
+  final List<VaultCard> cards;
+  final bool cameraLoading;
+  final VoidCallback onCapture;
+  final VoidCallback onOpenActive;
+  final VoidCallback onOpenVault;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassContainer(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Overview',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _StatCard(
+                label: 'Active cards',
+                value: '${cards.length}',
+                onTap: onOpenActive,
+              ),
+              const SizedBox(width: 12),
+              _StatCard(
+                label: 'Vaults',
+                value: '1',
+                onTap: onOpenVault,
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 340,
+            child: _BusinessTypeChart(
+              cards: cards,
+              cameraLoading: cameraLoading,
+              onCapture: onCapture,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -946,14 +1046,12 @@ class _BusinessTypeChartState extends State<_BusinessTypeChart>
     };
 
     if (total == 0) {
-      return Expanded(
-        child: Center(
-          child: Text(
-            'Add cards to see business type breakdown',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white54,
-                ),
-          ),
+      return Center(
+        child: Text(
+          'Add cards to see business type breakdown',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white54,
+              ),
         ),
       );
     }
@@ -977,14 +1075,12 @@ class _BusinessTypeChartState extends State<_BusinessTypeChart>
       }
     }
     if (sections.isEmpty) {
-      return Expanded(
-        child: Center(
-          child: Text(
-            'Add cards with business type to see chart',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white54,
-                ),
-          ),
+      return Center(
+        child: Text(
+          'Add cards with business type to see chart',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white54,
+              ),
         ),
       );
     }
@@ -1000,9 +1096,8 @@ class _BusinessTypeChartState extends State<_BusinessTypeChart>
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
-        return Expanded(
-          child: Column(
-            children: [
+        return Column(
+          children: [
               SizedBox(
                 height: 150,
                 child: Row(
@@ -1111,8 +1206,7 @@ class _BusinessTypeChartState extends State<_BusinessTypeChart>
                   ),
                 ),
               ),
-            ],
-          ),
+          ],
         );
       },
     );

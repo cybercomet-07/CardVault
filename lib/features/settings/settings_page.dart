@@ -152,16 +152,17 @@ class _SettingsPageState extends State<SettingsPage> {
     final email = user?.email ?? '';
 
     return PageScaffold(
-      body: Center(
-        child: Padding(
+      body: SafeArea(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: GlassContainer(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: GlassContainer(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -279,7 +280,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       }
                     },
                   ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
